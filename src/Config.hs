@@ -8,15 +8,23 @@ data Role
   | Slave
   deriving (Eq, Read, Show)
 
-data Config = Config
+data UserProvidedConfig = UserProvidedConfig
   { configMessageSendingDuration :: Int
   , configGracePeriodDuration :: Int
   , configRandomSeed :: Int
-  , configRole :: Role
+  }
+  deriving (Eq, Show)
+
+data FileProvidedConfig = FileProvidedConfig
+  { configRole :: Role
   , configHost :: String
   , configPort :: Int
   }
   deriving (Eq, Show)
+
+data Command
+  = CheckArgs UserProvidedConfig
+  | RunNode   UserProvidedConfig FileProvidedConfig
 
 
 stringOption :: String -> String -> String -> Parser String
@@ -31,16 +39,36 @@ configOption long_ metavar_ help_ = option auto
                                  <> metavar metavar_
                                  <> help    help_
 
-configParser :: Parser Config
-configParser = Config
-           <$> configOption "send-for"  "SECONDS"               "duration of the message-sending period"
-           <*> configOption "wait-for"  "SECONDS"               "duration of the grace period"
-           <*> configOption "with-seed" "INTEGER"               "fixes all the random decisions"
-           <*> configOption "role"      "Master|Slave"          "exactly one node should be the master"
-           <*> stringOption "host"      "localhost|IP|HOSTNAME" "hostname and port via which other nodes"
-           <*> configOption "port"      "INTEGER"               "will contact this node"
 
-configParserInfo :: ParserInfo Config
-configParserInfo = info (helper <*> configParser)
-                 $ fullDesc
-                <> progDesc "Exchanges messages with other nodes as per the CH/OTP Test Task"
+userParser :: Parser UserProvidedConfig
+userParser = UserProvidedConfig
+         <$> configOption "send-for"  "SECONDS"               "duration of the message-sending period"
+         <*> configOption "wait-for"  "SECONDS"               "duration of the grace period"
+         <*> configOption "with-seed" "INTEGER"               "fixes all the random decisions"
+
+fileParser :: Parser FileProvidedConfig
+fileParser = FileProvidedConfig
+               <$> configOption "role"      "Master|Slave"          "exactly one node should be the master"
+               <*> stringOption "host"      "localhost|IP|HOSTNAME" "hostname and port via which other nodes"
+               <*> configOption "port"      "INTEGER"               "will contact this node"
+
+commandParser :: Parser Command
+commandParser = subparser
+              $ command "check-args" checkArgsInfo
+             <> command "run-node"   runNodeInfo
+
+
+checkArgsInfo :: ParserInfo Command
+checkArgsInfo = info (helper <*> (CheckArgs <$> userParser))
+              $ fullDesc
+             <> progDesc "Verify that the arguments are correct, then exit"
+
+runNodeInfo :: ParserInfo Command
+runNodeInfo = info (helper <*> (RunNode <$> userParser <*> fileParser))
+            $ fullDesc
+           <> progDesc "Exchange messages with other nodes"
+
+commandInfo :: ParserInfo Command
+commandInfo = info (helper <*> commandParser)
+            $ fullDesc
+           <> progDesc "Samuel Gélineau's implementation of the CH/OTP Test Task"

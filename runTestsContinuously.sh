@@ -18,13 +18,13 @@ function kill_entire_family {
 
 stack install fswatcher
 
-./runTests.sh &
+./runTests.sh "$@" &
 PID="$!"
 trap "kill_entire_family $PID" EXIT
 
 fswatcher --path src echo "restart" | while read X; do
   kill_entire_family "$PID"
-  ./runTests.sh &
+  ./runTests.sh "$@" &
   PID="$!"
   trap "kill_entire_family $PID" EXIT
 done

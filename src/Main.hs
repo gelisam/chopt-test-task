@@ -6,7 +6,7 @@ import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node (initRemoteTable)
 import Options.Applicative (execParser)
 
-import Config (Config(..), configParserInfo, Role(..))
+import Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
 
 
 master :: Backend -> [NodeId] -> Process ()
@@ -22,16 +22,17 @@ master backend slaves = do
 
 main :: IO ()
 main = do
-    Config messageSendingDuration gracePeriodDuration
-           randomSeed
-           role
-           host port
-      <- execParser configParserInfo
-    
-    case role of
-      Master -> do
+    command <- execParser commandInfo
+    case command of
+      CheckArgs _ ->
+        -- if the arguments were incorrect, 'execParser' would have complained.
+        return ()
+      RunNode (UserProvidedConfig messageSendingDuration gracePeriodDuration
+                                  randomSeed)
+              (FileProvidedConfig role
+                                  host port)
+              -> do
         backend <- initializeBackend host (show port) initRemoteTable
-        startMaster backend (master backend)
-      Slave -> do
-        backend <- initializeBackend host (show port) initRemoteTable
-        startSlave backend
+        case role of
+          Master -> startMaster backend (master backend)
+          Slave  -> startSlave  backend
