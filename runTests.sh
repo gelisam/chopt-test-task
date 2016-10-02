@@ -5,9 +5,9 @@ stack install
 
 clear
 
-chopt-test-task slave localhost 8080 &
-chopt-test-task slave localhost 8081 &
-chopt-test-task slave localhost 8082 &
-chopt-test-task slave localhost 8083 &
-sleep 1
-chopt-test-task master localhost 8084
+cat nodelist.txt | while IFS='' read -r NODE_CONFIG; do
+  # NODE_CONFIG looks like "slave localhost 8080",
+  # we want it to expand to multiple arguments
+  echo chopt-test-task $NODE_CONFIG &
+  chopt-test-task $NODE_CONFIG &
+done
