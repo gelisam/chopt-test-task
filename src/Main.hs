@@ -1,9 +1,9 @@
 module Main where
 
-import System.Environment (getArgs)
 import Control.Distributed.Process
-import Control.Distributed.Process.Node (initRemoteTable)
 import Control.Distributed.Process.Backend.SimpleLocalnet
+import Control.Distributed.Process.Node (initRemoteTable)
+import System.Environment (getArgs)
 
 
 master :: Backend -> [NodeId] -> Process ()
