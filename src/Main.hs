@@ -4,7 +4,9 @@ import Control.Concurrent (threadDelay)
 import Control.Distributed.Process
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node (initRemoteTable)
-import System.Environment (getArgs)
+import Options.Applicative (execParser)
+
+import Config (Config(..), configParserInfo, Role(..))
 
 
 master :: Backend -> [NodeId] -> Process ()
@@ -20,12 +22,16 @@ master backend slaves = do
 
 main :: IO ()
 main = do
-  args <- getArgs
-  
-  case args of
-    ["master", host, port] -> do
-      backend <- initializeBackend host port initRemoteTable
-      startMaster backend (master backend)
-    ["slave", host, port] -> do
-      backend <- initializeBackend host port initRemoteTable
-      startSlave backend
+    Config messageSendingDuration gracePeriodDuration
+           randomSeed
+           role
+           host port
+      <- execParser configParserInfo
+    
+    case role of
+      Master -> do
+        backend <- initializeBackend host (show port) initRemoteTable
+        startMaster backend (master backend)
+      Slave -> do
+        backend <- initializeBackend host (show port) initRemoteTable
+        startSlave backend

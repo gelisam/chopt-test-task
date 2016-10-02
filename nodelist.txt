@@ -1,5 +1,5 @@
-slave localhost 8080
-slave localhost 8081
-slave localhost 8082
-slave localhost 8083
-master localhost 8084
+--role=Slave  --host=localhost --port=8080
+--role=Slave  --host=localhost --port=8081
+--role=Slave  --host=localhost --port=8082
+--role=Slave  --host=localhost --port=8083
+--role=Master --host=localhost --port=8084
