@@ -12,7 +12,7 @@ import Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserP
 master :: Backend -> [NodeId] -> Process ()
 master backend slaves = do
   -- give the slaves a reasonable amount of time to connect
-  liftIO $ threadDelay (2000 * 1000) -- 2s
+  liftIO $ threadDelay (3000 * 1000) -- 3s
   
   -- Do something interesting with the slaves
   liftIO . putStrLn $ "Slaves: " ++ show slaves
