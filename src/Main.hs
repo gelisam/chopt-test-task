@@ -10,7 +10,7 @@ import System.Environment (getArgs)
 master :: Backend -> [NodeId] -> Process ()
 master backend slaves = do
   -- give the slaves a reasonable amount of time to connect
-  liftIO $ threadDelay (1000 * 1000) -- 1s
+  liftIO $ threadDelay (2000 * 1000) -- 2s
   
   -- Do something interesting with the slaves
   liftIO . putStrLn $ "Slaves: " ++ show slaves
@@ -21,7 +21,7 @@ master backend slaves = do
 main :: IO ()
 main = do
   args <- getArgs
-
+  
   case args of
     ["master", host, port] -> do
       backend <- initializeBackend host port initRemoteTable
