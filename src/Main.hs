@@ -16,45 +16,45 @@ import Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserP
 
 master :: Backend -> [NodeId] -> Process ()
 master backend slaves = do
-  -- give the slaves a reasonable amount of time to connect
-  liftIO $ threadDelay (3000 * 1000) -- 3s
-  
-  -- Do something interesting with the slaves
-  liftIO . putStrLn $ "Slaves: " ++ show slaves
-  
-  -- Terminate the slaves when the master terminates (this is optional)
-  terminateAllSlaves backend
-  
-  
-  -- Network.Transport.TCP's hello world
-  liftIO $ do
-    serverAddr <- newEmptyMVar
-    clientDone <- newEmptyMVar
+    -- give the slaves a reasonable amount of time to connect
+    liftIO $ threadDelay (3000 * 1000) -- 3s
     
-    Right transport <- createTransport "127.0.0.1" "10080" defaultTCPParameters
+    -- Do something interesting with the slaves
+    liftIO . putStrLn $ "Slaves: " ++ show slaves
     
-    -- "Server"
-    forkIO $ do
-      Right endpoint <- newEndPoint transport
-      putMVar serverAddr (address endpoint)
+    -- Terminate the slaves when the master terminates (this is optional)
+    terminateAllSlaves backend
+    
+    
+    -- Network.Transport.TCP's hello world
+    liftIO $ do
+      serverAddr <- newEmptyMVar
+      clientDone <- newEmptyMVar
       
-      forever $ do
-        event <- receive endpoint
-        case event of
-          Received _ msg -> print msg
-          _ -> return () -- ignore
-    
-    -- "Client"
-    forkIO $ do
-      Right endpoint <- newEndPoint transport
-      Right conn     <- do addr <- readMVar serverAddr
-                           connect endpoint addr ReliableOrdered defaultConnectHints
-      send conn [fromString "Hello world"]
-      putMVar clientDone ()
-    
-    -- Wait for the client to finish
-    _ <- takeMVar clientDone
-    return ()
+      Right transport <- createTransport "127.0.0.1" "10080" defaultTCPParameters
+      
+      -- "Server"
+      forkIO $ do
+        Right endpoint <- newEndPoint transport
+        putMVar serverAddr (address endpoint)
+        
+        forever $ do
+          event <- receive endpoint
+          case event of
+            Received _ msg -> print msg
+            _ -> return () -- ignore
+      
+      -- "Client"
+      forkIO $ do
+        Right endpoint <- newEndPoint transport
+        Right conn     <- do addr <- readMVar serverAddr
+                             connect endpoint addr ReliableOrdered defaultConnectHints
+        send conn [fromString "Hello world"]
+        putMVar clientDone ()
+      
+      -- Wait for the client to finish
+      _ <- takeMVar clientDone
+      return ()
 
 main :: IO ()
 main = do
