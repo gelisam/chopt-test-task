@@ -7,6 +7,7 @@ import Control.Distributed.Process.Node (initRemoteTable)
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.String
+import Network.Socket (withSocketsDo)
 import Network.Transport
 import Network.Transport.TCP (createTransport, defaultTCPParameters)
 import Options.Applicative (execParser)
@@ -57,7 +58,7 @@ master backend slaves = do
       return ()
 
 main :: IO ()
-main = do
+main = withSocketsDo $ do
     command <- execParser commandInfo
     case command of
       CheckArgs _ ->
