@@ -34,7 +34,7 @@ master backend slaves = do
       Right transport <- createTransport "127.0.0.1" "10080" defaultTCPParameters
       
       -- "Server"
-      forkIO $ do
+      _ <- forkIO $ do
         Right endpoint <- newEndPoint transport
         putMVar serverAddr (address endpoint)
         
@@ -45,11 +45,11 @@ master backend slaves = do
             _ -> return () -- ignore
       
       -- "Client"
-      forkIO $ do
+      _ <- forkIO $ do
         Right endpoint <- newEndPoint transport
         Right conn     <- do addr <- readMVar serverAddr
                              connect endpoint addr ReliableOrdered defaultConnectHints
-        send conn [fromString "Hello world"]
+        _ <- send conn [fromString "Hello world"]
         putMVar clientDone ()
       
       -- Wait for the client to finish
