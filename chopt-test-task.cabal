@@ -16,7 +16,10 @@ executable chopt-test-task
                      , doctest
                      , distributed-process
                      , distributed-process-simplelocalnet
+                     , network-transport
+                     , network-transport-tcp
                      , optparse-applicative
+                     , transformers
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options: -W -Wall

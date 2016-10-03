@@ -1,9 +1,14 @@
 module Main where
 
-import Control.Concurrent (threadDelay)
-import Control.Distributed.Process
+import Control.Concurrent
+import Control.Distributed.Process (NodeId, Process)
 import Control.Distributed.Process.Backend.SimpleLocalnet
 import Control.Distributed.Process.Node (initRemoteTable)
+import Control.Monad
+import Control.Monad.IO.Class
+import Data.String
+import Network.Transport
+import Network.Transport.TCP (createTransport, defaultTCPParameters)
 import Options.Applicative (execParser)
 
 import Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
@@ -19,6 +24,37 @@ master backend slaves = do
   
   -- Terminate the slaves when the master terminates (this is optional)
   terminateAllSlaves backend
+  
+  
+  -- Network.Transport.TCP's hello world
+  liftIO $ do
+    serverAddr <- newEmptyMVar
+    clientDone <- newEmptyMVar
+    
+    Right transport <- createTransport "127.0.0.1" "10080" defaultTCPParameters
+    
+    -- "Server"
+    forkIO $ do
+      Right endpoint <- newEndPoint transport
+      putMVar serverAddr (address endpoint)
+      
+      forever $ do
+        event <- receive endpoint
+        case event of
+          Received _ msg -> print msg
+          _ -> return () -- ignore
+    
+    -- "Client"
+    forkIO $ do
+      Right endpoint <- newEndPoint transport
+      Right conn     <- do addr <- readMVar serverAddr
+                           connect endpoint addr ReliableOrdered defaultConnectHints
+      send conn [fromString "Hello world"]
+      putMVar clientDone ()
+    
+    -- Wait for the client to finish
+    _ <- takeMVar clientDone
+    return ()
 
 main :: IO ()
 main = do
