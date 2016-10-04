@@ -16,7 +16,6 @@ executable chopt-test-task
                      , doctest
                      , distributed-process
                      , distributed-process-simplelocalnet
-                     , network
                      , network-transport
                      , network-transport-tcp
                      , optparse-applicative
