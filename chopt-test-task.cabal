@@ -15,7 +15,6 @@ executable chopt-test-task
   build-depends:       base >=4.8 && <4.9
                      , doctest
                      , distributed-process
-                     , distributed-process-simplelocalnet
                      , network-transport
                      , network-transport-tcp
                      , optparse-applicative

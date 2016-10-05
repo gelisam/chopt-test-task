@@ -1,11 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import Control.Concurrent
-import Control.Distributed.Process (NodeId, Process)
-import Control.Distributed.Process.Backend.SimpleLocalnet
-import Control.Distributed.Process.Node (initRemoteTable)
 import Control.Monad
-import Control.Monad.IO.Class
 import Data.String
 import Network.Transport
 import Network.Transport.TCP (createTransport, defaultTCPParameters)
@@ -14,47 +10,32 @@ import Options.Applicative (execParser)
 import Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
 
 
-master :: Backend -> [NodeId] -> Process ()
-master backend slaves = do
-    -- give the slaves a reasonable amount of time to connect
-    liftIO $ threadDelay (3000 * 1000) -- 3s
+fromRightM :: (Show e, Monad m) => Either e a -> m a
+fromRightM (Left  e) = fail (show e)
+fromRightM (Right x) = return x
+
+
+server :: IO ()
+server = do
+    transport <- fromRightM =<< createTransport "127.0.0.1" "10080" defaultTCPParameters
+    endpoint <- fromRightM =<< newEndPoint transport
     
-    -- Do something interesting with the slaves
-    liftIO . putStrLn $ "Slaves: " ++ show slaves
+    forever $ do
+      event <- receive endpoint
+      case event of
+        Received _ msg -> print msg
+        _ -> return () -- ignore
+
+client :: IO ()
+client = do
+    transport <- fromRightM =<< createTransport "127.0.0.1" "10081" defaultTCPParameters
+    endpoint <- fromRightM =<< newEndPoint transport
     
-    -- Terminate the slaves when the master terminates (this is optional)
-    terminateAllSlaves backend
+    let serverAddr = EndPointAddress "127.0.0.1:10080:0"
+    conn <- fromRightM =<< connect endpoint serverAddr ReliableOrdered defaultConnectHints
+    _ <- send conn [fromString "Hello world"]
     
-    
-    -- Network.Transport.TCP's hello world
-    liftIO $ do
-      serverAddr <- newEmptyMVar
-      clientDone <- newEmptyMVar
-      
-      Right transport <- createTransport "127.0.0.1" "10080" defaultTCPParameters
-      
-      -- "Server"
-      _ <- forkIO $ do
-        Right endpoint <- newEndPoint transport
-        putMVar serverAddr (address endpoint)
-        
-        forever $ do
-          event <- receive endpoint
-          case event of
-            Received _ msg -> print msg
-            _ -> return () -- ignore
-      
-      -- "Client"
-      _ <- forkIO $ do
-        Right endpoint <- newEndPoint transport
-        Right conn     <- do addr <- readMVar serverAddr
-                             connect endpoint addr ReliableOrdered defaultConnectHints
-        _ <- send conn [fromString "Hello world"]
-        putMVar clientDone ()
-      
-      -- Wait for the client to finish
-      _ <- takeMVar clientDone
-      return ()
+    return ()
 
 main :: IO ()
 main = do
@@ -68,7 +49,6 @@ main = do
               (FileProvidedConfig role
                                   host port)
               -> do
-        backend <- initializeBackend host (show port) initRemoteTable
         case role of
-          Master -> startMaster backend (master backend)
-          Slave  -> startSlave  backend
+          Master -> server
+          Slave  -> client
