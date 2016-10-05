@@ -15,6 +15,6 @@ chopt-test-task check-args "$@"
 #  # we want it to expand to multiple arguments
 #  chopt-test-task run-node "$@" $NODE_CONFIG &
 #done
-chopt-test-task run-node --role=Master --host=localhost --port=8084 "$@" &
-sleep 5
 chopt-test-task run-node --role=Slave  --host=localhost --port=8083 "$@" &
+sleep 5
+chopt-test-task run-node --role=Master --host=localhost --port=8084 "$@" &

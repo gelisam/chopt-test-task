@@ -13,6 +13,7 @@ executable chopt-test-task
   main-is:             Main.hs
   other-modules:       Config
   build-depends:       base >=4.8 && <4.9
+                     , bytestring
                      , doctest
                      , distributed-process
                      , network-transport
