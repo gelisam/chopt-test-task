@@ -9,21 +9,21 @@ data Role
   deriving (Eq, Read, Show)
 
 data UserProvidedConfig = UserProvidedConfig
-  { configMessageSendingDuration :: Int
-  , configGracePeriodDuration :: Int
-  , configRandomSeed :: Int
+  { configMessageSendingDuration :: !Int
+  , configGracePeriodDuration    :: !Int
+  , configRandomSeed             :: !Int
   }
   deriving (Eq, Show)
 
 data FileProvidedConfig = FileProvidedConfig
-  { configRole :: Role
-  , configAddress :: String
+  { configRole    :: !Role
+  , configAddress :: !String
   }
   deriving (Eq, Show)
 
 data Command
-  = CheckArgs UserProvidedConfig
-  | RunNode   UserProvidedConfig FileProvidedConfig
+  = CheckArgs !UserProvidedConfig
+  | RunNode   !UserProvidedConfig !FileProvidedConfig
 
 
 stringOption :: String -> String -> String -> Parser String

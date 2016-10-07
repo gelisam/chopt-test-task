@@ -13,9 +13,9 @@ import           Control.Monad.MyExtra
 
 -- Addresses from Network.Transport.TCP look like "localhost:8080:0"
 data Address = Address
-  { addressHost    :: String
-  , addressPort    :: Int
-  , addressChannel :: Int
+  { addressHost    :: !String
+  , addressPort    :: !Int
+  , addressChannel :: !Int
   }
 
 parseAddress :: Monad m => String -> m Address
