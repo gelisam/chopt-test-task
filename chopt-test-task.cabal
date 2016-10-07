@@ -12,6 +12,8 @@ cabal-version:       >=1.10
 executable chopt-test-task
   main-is:             Main.hs
   other-modules:       Config
+                     , Control.Monad.MyExtra
+                     , Network.Transport.MyExtra
   build-depends:       base >=4.8 && <4.9
                      , bytestring
                      , doctest
