@@ -25,8 +25,8 @@ createTransportStubbornly host port = untilM $ do
         return $ Just transport
 
 connectStubbornly :: EndPoint -> String -> Int -> IO Connection
-connectStubbornly endpoint host port = untilM $ do
-    r <- connect endpoint address ReliableOrdered defaultConnectHints
+connectStubbornly localEndpoint host port = untilM $ do
+    r <- connect localEndpoint remoteAddress ReliableOrdered defaultConnectHints
     case r of
       Left (TransportError ConnectNotFound _) -> do
         -- the remote program probably isn't fully-initialized yet, try again.
@@ -38,5 +38,5 @@ connectStubbornly endpoint host port = untilM $ do
       Right connection ->
         return $ Just connection
   where
-    address :: EndPointAddress
-    address = EndPointAddress $ ByteString.pack $ printf "%s:%d:0" host port
+    remoteAddress :: EndPointAddress
+    remoteAddress = EndPointAddress $ ByteString.pack $ printf "%s:%d:0" host port
