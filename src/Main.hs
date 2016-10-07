@@ -10,12 +10,13 @@ import           Options.Applicative (execParser)
 import           Control.Monad.MyExtra
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
 import           Network.Transport.MyExtra
+import           Network.Transport.TCP.Address
 
 
-server :: IO ()
-server = do
-    transport <- createTransportStubbornly "127.0.0.1" 10080
-    endpoint <- fromRightM =<< newEndPoint transport
+server :: Address -> IO ()
+server myAddress = do
+    transport <- createTransportStubbornly myAddress
+    endpoint <- join $ fromRightM <$> newEndPoint transport
     
     forever $ do
       event <- receive endpoint
@@ -23,12 +24,12 @@ server = do
         Received _ msg -> print msg
         _ -> return () -- ignore
 
-client :: IO ()
-client = do
-    transport <- createTransportStubbornly "127.0.0.1" 10081
-    endpoint <- fromRightM =<< newEndPoint transport
+client :: Address -> Address -> IO ()
+client myAddress serverAddress = do
+    transport <- createTransportStubbornly myAddress
+    endpoint <- join $ fromRightM <$> newEndPoint transport
     
-    conn <- connectStubbornly endpoint "127.0.0.1" 10080
+    conn <- connectStubbornly endpoint serverAddress
     _ <- send conn [fromString "Hello world"]
     return ()
 
@@ -41,9 +42,8 @@ main = do
         return ()
       RunNode (UserProvidedConfig messageSendingDuration gracePeriodDuration
                                   randomSeed)
-              (FileProvidedConfig role
-                                  host port)
+              (FileProvidedConfig role myAddress)
               -> do
         case role of
-          Master -> server
-          Slave  -> client
+          Master -> join $ server <$> parseAddress myAddress
+          Slave  -> join $ client <$> parseAddress myAddress <*> parseAddress "localhost:8081:0"

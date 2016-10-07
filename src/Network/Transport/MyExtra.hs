@@ -1,18 +1,18 @@
+{-# LANGUAGE RecordWildCards #-}
 module Network.Transport.MyExtra where
 
 import           Control.Concurrent (threadDelay)
-import qualified Data.ByteString.Char8 as ByteString
 import           Network.Transport
 import           Network.Transport.TCP (createTransport, defaultTCPParameters)
 import           System.IO.Error (isAlreadyInUseError)
-import           Text.Printf
 
 import           Control.Monad.MyExtra
+import           Network.Transport.TCP.Address
 
 
-createTransportStubbornly :: String -> Int -> IO Transport
-createTransportStubbornly host port = untilM $ do
-    r <- createTransport host (show port) defaultTCPParameters
+createTransportStubbornly :: Address -> IO Transport
+createTransportStubbornly (Address {..}) = untilM $ do
+    r <- createTransport addressHost (show addressPort) defaultTCPParameters
     case r of
       Left err | isAlreadyInUseError err -> do
         -- sometimes the OS keeps sockets busy for a minute after a server stops, try again
@@ -24,9 +24,9 @@ createTransportStubbornly host port = untilM $ do
       Right transport ->
         return $ Just transport
 
-connectStubbornly :: EndPoint -> String -> Int -> IO Connection
-connectStubbornly localEndpoint host port = untilM $ do
-    r <- connect localEndpoint remoteAddress ReliableOrdered defaultConnectHints
+connectStubbornly :: EndPoint -> Address -> IO Connection
+connectStubbornly localEndpoint remoteAddress = untilM $ do
+    r <- connect localEndpoint (endpointAddress remoteAddress) ReliableOrdered defaultConnectHints
     case r of
       Left (TransportError ConnectNotFound _) -> do
         -- the remote program probably isn't fully-initialized yet, try again.
@@ -37,6 +37,3 @@ connectStubbornly localEndpoint host port = untilM $ do
         fail err
       Right connection ->
         return $ Just connection
-  where
-    remoteAddress :: EndPointAddress
-    remoteAddress = EndPointAddress $ ByteString.pack $ printf "%s:%d:0" host port

@@ -17,8 +17,7 @@ data UserProvidedConfig = UserProvidedConfig
 
 data FileProvidedConfig = FileProvidedConfig
   { configRole :: Role
-  , configHost :: String
-  , configPort :: Int
+  , configAddress :: String
   }
   deriving (Eq, Show)
 
@@ -42,15 +41,14 @@ configOption long_ metavar_ help_ = option auto
 
 userParser :: Parser UserProvidedConfig
 userParser = UserProvidedConfig
-         <$> configOption "send-for"  "SECONDS"               "duration of the message-sending period"
-         <*> configOption "wait-for"  "SECONDS"               "duration of the grace period"
-         <*> configOption "with-seed" "INTEGER"               "fixes all the random decisions"
+         <$> configOption "send-for"  "SECONDS"      "duration of the message-sending period"
+         <*> configOption "wait-for"  "SECONDS"      "duration of the grace period"
+         <*> configOption "with-seed" "INTEGER"      "fixes all the random decisions"
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
-               <$> configOption "role"      "Master|Slave"          "exactly one node should be the master"
-               <*> stringOption "host"      "localhost|IP|HOSTNAME" "hostname and port via which other nodes"
-               <*> configOption "port"      "INTEGER"               "will contact this node"
+         <$> configOption "role"      "Master|Slave" "exactly one node should be the master"
+         <*> stringOption "address"   "ADDRESS"      "a network-transport-tcp address, e.g. \"localhost:8080:0\""
 
 commandParser :: Parser Command
 commandParser = subparser

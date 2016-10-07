@@ -1,5 +1,2 @@
---role=Slave  --host=localhost --port=8080
---role=Slave  --host=localhost --port=8081
---role=Slave  --host=localhost --port=8082
---role=Slave  --host=localhost --port=8083
---role=Master --host=localhost --port=8084
+---role=Slave  --address=localhost:8080:0
+---role=Master --address=localhost:8081:0
