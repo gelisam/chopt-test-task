@@ -14,6 +14,7 @@ executable chopt-test-task
   other-modules:       Config
                      , Control.Monad.MyExtra
                      , Data.Binary.Strict
+                     , Message
                      , Network.Transport.MyExtra
                      , Network.Transport.TCP.Address
                      , Text.Parsable
@@ -25,6 +26,7 @@ executable chopt-test-task
                      , network-transport
                      , network-transport-tcp
                      , optparse-applicative
+                     , random
                      , split
                      , transformers
   hs-source-dirs:      src

@@ -6,6 +6,7 @@ import           Text.Printf
 
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
 import           Control.Monad.MyExtra
+import           Message
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
 import           Text.Parsable
@@ -17,13 +18,12 @@ runNode myAddress peerAddresses = do
     connections <- mapM (connectStubbornly endpoint) peerAddresses
     
     -- send a message to everyone
-    let myMessage :: String
-        myMessage = printf "hello from %s" (unparse myAddress)
+    myMessage <- randomMessage
     mapM_ (sendOne myMessage) connections
     
     -- receive a message from everyone
     untilTotalM (length connections) $ do
-      messages <- receiveMany endpoint :: IO [String]
+      messages <- receiveMany endpoint :: IO [Message]
       forM_ messages $ \message ->
         printf "%s received %s\n" (unparse myAddress) (show message)
       return (length messages)
