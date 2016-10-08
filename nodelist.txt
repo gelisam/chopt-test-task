@@ -1,2 +1,6 @@
 localhost:8080:0
 localhost:8081:0
+localhost:8082:0
+localhost:8083:0
+localhost:8084:0
+localhost:8085:0
