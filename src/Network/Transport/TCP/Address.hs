@@ -30,7 +30,7 @@ parseAddress s = s & splitOn ":" & \case
                        (show s)
 
 unparseAddress :: Address -> String
-unparseAddress (Address {..}) = printf "%s:%d:0" addressHost addressPort
+unparseAddress (Address {..}) = printf "%s:%d:%d" addressHost addressPort addressChannel
 
 
 endpointAddress :: Address -> EndPointAddress

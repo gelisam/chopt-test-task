@@ -7,7 +7,6 @@ import           Data.String
 import           Network.Transport
 import           Options.Applicative (execParser)
 
-import           Control.Monad.MyExtra
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
@@ -15,8 +14,7 @@ import           Network.Transport.TCP.Address
 
 server :: Address -> IO ()
 server myAddress = do
-    transport <- createTransportStubbornly myAddress
-    endpoint <- join $ fromRightM <$> newEndPoint transport
+    endpoint <- createEndpointStubbornly myAddress
     
     forever $ do
       event <- receive endpoint
@@ -26,8 +24,7 @@ server myAddress = do
 
 client :: Address -> Address -> IO ()
 client myAddress serverAddress = do
-    transport <- createTransportStubbornly myAddress
-    endpoint <- join $ fromRightM <$> newEndPoint transport
+    endpoint <- createEndpointStubbornly myAddress
     
     conn <- connectStubbornly endpoint serverAddress
     _ <- send conn [fromString "Hello world"]

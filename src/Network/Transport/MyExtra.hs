@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Network.Transport.MyExtra where
 
+import           Control.Monad (join)
 import           Control.Concurrent (threadDelay)
 import           Network.Transport
 import           Network.Transport.TCP (createTransport, defaultTCPParameters)
@@ -11,8 +12,8 @@ import           Control.Monad.MyExtra
 import           Network.Transport.TCP.Address
 
 
-createTransportStubbornly :: Address -> IO Transport
-createTransportStubbornly (Address {..}) = untilM $ do
+createEndpointStubbornly :: Address -> IO EndPoint
+createEndpointStubbornly expectedAddress@(Address {..}) = untilM $ do
     r <- createTransport addressHost (show addressPort) defaultTCPParameters
     case r of
       Left err | isAlreadyInUseError err -> do
@@ -22,8 +23,15 @@ createTransportStubbornly (Address {..}) = untilM $ do
         return Nothing
       Left err ->
         fail $ show err
-      Right transport ->
-        return $ Just transport
+      Right transport -> do
+        endpoint <- join $ fromRightM <$> newEndPoint transport
+        if address endpoint == endpointAddress expectedAddress
+        then
+          return $ Just endpoint
+        else
+          fail $ printf "transport creation succeeded but the resulting address %s isn't the expected %s"
+                        (show $ address endpoint)
+                        (show $ unparseAddress expectedAddress)
 
 connectStubbornly :: EndPoint -> Address -> IO Connection
 connectStubbornly localEndpoint remoteAddress = untilM $ do

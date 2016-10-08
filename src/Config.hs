@@ -48,7 +48,7 @@ userParser = UserProvidedConfig
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
          <$> configOption "role"      "Master|Slave" "exactly one node should be the master"
-         <*> stringOption "address"   "ADDRESS"      "a network-transport-tcp address, e.g. \"localhost:8080:0\""
+         <*> stringOption "address"   "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
 
 commandParser :: Parser Command
 commandParser = subparser
