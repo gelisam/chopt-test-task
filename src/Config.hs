@@ -2,6 +2,7 @@ module Config where
 
 import Options.Applicative
 
+import Network.Transport.TCP.Address
 import Text.Parsable
 
 
@@ -19,7 +20,7 @@ data UserProvidedConfig = UserProvidedConfig
 
 data FileProvidedConfig = FileProvidedConfig
   { configRole    :: !Role
-  , configAddress :: !String
+  , configAddress :: !Address
   }
   deriving (Eq, Show)
 

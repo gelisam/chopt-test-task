@@ -18,6 +18,7 @@ data Address = Address
   , addressPort    :: !Int
   , addressChannel :: !Int
   }
+  deriving (Eq, Show)
 
 instance Parsable Address where
     parse s = s & splitOn ":" & \case

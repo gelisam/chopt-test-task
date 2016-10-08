@@ -43,5 +43,5 @@ main = do
               (FileProvidedConfig role myAddress)
               -> do
         case role of
-          Master -> join $ server <$> parse myAddress
-          Slave  -> join $ client <$> parse myAddress <*> parse "localhost:8081:0"
+          Master -> server myAddress
+          Slave  -> join $ client myAddress <$> parse "localhost:8081:0"
