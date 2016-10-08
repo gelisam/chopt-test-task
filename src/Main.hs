@@ -3,13 +3,13 @@
 module Main where
 
 import           Control.Monad
-import           Data.String
 import           Network.Transport
 import           Options.Applicative (execParser)
 import           Text.Printf
 
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
 import           Control.Monad.MyExtra
+import qualified Data.Binary.Strict as Binary
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
 import           Text.Parsable
@@ -21,16 +21,19 @@ runNode myAddress peerAddresses = do
     connections <- mapM (connectStubbornly endpoint) peerAddresses
     
     -- send a message to everyone
-    let myMessage = fromString $ printf "hello from %s" (unparse myAddress)
+    let myMessage :: String
+        myMessage = printf "hello from %s" (unparse myAddress)
     forM_ connections $ \connection ->
-      join $ fromRightM <$> send connection [myMessage]
+      join $ fromRightM <$> send connection [Binary.encode myMessage]
     
     -- receive a message from everyone
     untilTotalM (length connections) $ receive endpoint >>= \case
-      Received _ messages -> do
-        forM_ messages $ \message ->
+      Received _ encodedMessages -> do
+        forM_ encodedMessages $ \encodedMessage -> do
+          let message :: String
+              message = Binary.decode encodedMessage
           printf "%s received %s\n" (unparse myAddress) (show message)
-        return (length messages)
+        return (length encodedMessages)
       ConnectionOpened {} ->
         -- ignored
         return 0
