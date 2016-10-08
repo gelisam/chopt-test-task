@@ -6,11 +6,6 @@ import Network.Transport.TCP.Address
 import Text.Parsable
 
 
-data Role
-  = Master
-  | Slave
-  deriving (Eq, Read, Show)
-
 data UserProvidedConfig = UserProvidedConfig
   { configMessageSendingDuration :: !Int
   , configGracePeriodDuration    :: !Int
@@ -19,8 +14,7 @@ data UserProvidedConfig = UserProvidedConfig
   deriving (Eq, Show)
 
 data FileProvidedConfig = FileProvidedConfig
-  { configRole    :: !Role
-  , configAddress :: !Address
+  { configAddress :: !Address
   }
   deriving (Eq, Show)
 
@@ -50,8 +44,7 @@ userParser = UserProvidedConfig
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
-         <$> configOption   "role"    "Master|Slave" "exactly one node should be the master"
-         <*> parsableOption "address" "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
+         <$> parsableOption "address" "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
 
 commandParser :: Parser Command
 commandParser = subparser

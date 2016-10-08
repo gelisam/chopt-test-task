@@ -6,30 +6,36 @@ import           Control.Monad
 import           Data.String
 import           Network.Transport
 import           Options.Applicative (execParser)
+import           Text.Printf
 
-import           Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
+import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
+import           Control.Monad.MyExtra
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
 import           Text.Parsable
 
 
-server :: Address -> IO ()
-server myAddress = do
+runNode :: Address -> [Address] -> IO ()
+runNode myAddress peerAddresses = do
     endpoint <- createEndpointStubbornly myAddress
+    connections <- mapM (connectStubbornly endpoint) peerAddresses
     
-    forever $ do
-      event <- receive endpoint
-      case event of
-        Received _ msg -> print msg
-        _ -> return () -- ignore
-
-client :: Address -> Address -> IO ()
-client myAddress serverAddress = do
-    endpoint <- createEndpointStubbornly myAddress
+    -- send a message to everyone
+    let myMessage = fromString $ printf "hello from %s" (unparse myAddress)
+    forM_ connections $ \connection ->
+      join $ fromRightM <$> send connection [myMessage]
     
-    conn <- connectStubbornly endpoint serverAddress
-    _ <- send conn [fromString "Hello world"]
-    return ()
+    -- receive a message from everyone
+    untilTotalM (length connections) $ receive endpoint >>= \case
+      Received _ messages -> do
+        forM_ messages $ \message ->
+          printf "%s received %s\n" (unparse myAddress) (show message)
+        return (length messages)
+      ConnectionOpened {} ->
+        -- ignored
+        return 0
+      err -> do
+        fail (show err)
 
 main :: IO ()
 main = do
@@ -40,8 +46,8 @@ main = do
         return ()
       RunNode (UserProvidedConfig messageSendingDuration gracePeriodDuration
                                   randomSeed)
-              (FileProvidedConfig role myAddress)
+              (FileProvidedConfig myAddress)
               -> do
-        case role of
-          Master -> server myAddress
-          Slave  -> join $ client myAddress <$> parse "localhost:8081:0"
+        allAddresses <- join $ mapM parse <$> lines <$> readFile "nodelist.txt"
+        let peerAddresses = filter (/= myAddress) allAddresses
+        runNode myAddress peerAddresses

@@ -1,2 +1,2 @@
---role=Slave  --address=localhost:8080:0
---role=Master --address=localhost:8081:0
+localhost:8080:0
+localhost:8081:0

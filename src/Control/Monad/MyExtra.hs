@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Control.Monad.MyExtra where
@@ -8,10 +9,21 @@ import Data.Typeable
 import Text.Printf
 
 
+-- run the body until its accumulated results reaches the limit
+untilTotalM :: Monad m => Int -> m Int -> m ()
+untilTotalM limit body = loop 0
+  where
+    loop !acc | acc >= limit = return ()
+              | otherwise    = do
+      n <- body
+      loop (acc + n)
+
+-- convert 'Either' failures into other kinds of monadic failures
 fromRightM :: (Show e, Monad m) => Either e a -> m a
 fromRightM (Left  e) = fail $ show e
 fromRightM (Right x) = return x
 
+-- a version of 'read' which fails with a more readable error message
 readM :: forall m a. (Monad m, Read a, Typeable a) => String -> m a
 readM s = reads s & \case
     [(x,"")] -> return x
@@ -19,7 +31,8 @@ readM s = reads s & \case
                               (show $ typeRep (Proxy :: Proxy a))
                               (show s)
 
-untilM :: Monad m => m (Maybe a) -> m a
-untilM body = body >>= \case
-    Nothing -> untilM body
+-- run the body until it return 'Nothing'
+untilNothingM :: Monad m => m (Maybe a) -> m a
+untilNothingM body = body >>= \case
+    Nothing -> untilNothingM body
     Just x  -> return x
