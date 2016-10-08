@@ -9,6 +9,7 @@ import           Network.Transport
 import           Text.Printf
 
 import           Control.Monad.MyExtra
+import           Text.Parsable
 
 
 -- Addresses from Network.Transport.TCP look like "localhost:8080:0"
@@ -18,22 +19,19 @@ data Address = Address
   , addressChannel :: !Int
   }
 
-
-parseAddress :: Monad m => String -> m Address
-parseAddress s = s & splitOn ":" & \case
-    [host, port, channel] -> Address
-                         <$> pure host
-                         <*> readM port
-                         <*> readM channel
-    _ -> fail $ printf "expected an address of the style %s, got %s"
-                       (show "localhost:8080:0")
-                       (show s)
-
-unparseAddress :: Address -> String
-unparseAddress (Address {..}) = printf "%s:%d:%d" addressHost addressPort addressChannel
+instance Parsable Address where
+    parse s = s & splitOn ":" & \case
+        [host, port, channel] -> Address
+                             <$> pure host
+                             <*> readM port
+                             <*> readM channel
+        _ -> fail $ printf "expected an address of the style %s, got %s"
+                           (show "localhost:8080:0")
+                           (show s)
+    unparse (Address {..}) = printf "%s:%d:%d" addressHost addressPort addressChannel
 
 
 endpointAddress :: Address -> EndPointAddress
 endpointAddress = EndPointAddress
                 . ByteString.pack
-                . unparseAddress
+                . unparse

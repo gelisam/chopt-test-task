@@ -10,6 +10,7 @@ import           Text.Printf
 
 import           Control.Monad.MyExtra
 import           Network.Transport.TCP.Address
+import           Text.Parsable
 
 
 createEndpointStubbornly :: Address -> IO EndPoint
@@ -31,7 +32,7 @@ createEndpointStubbornly expectedAddress@(Address {..}) = untilM $ do
         else
           fail $ printf "transport creation succeeded but the resulting address %s isn't the expected %s"
                         (show $ address endpoint)
-                        (show $ unparseAddress expectedAddress)
+                        (show $ unparse expectedAddress)
 
 connectStubbornly :: EndPoint -> Address -> IO Connection
 connectStubbornly localEndpoint remoteAddress = untilM $ do
@@ -39,7 +40,7 @@ connectStubbornly localEndpoint remoteAddress = untilM $ do
     case r of
       Left (TransportError ConnectNotFound _) -> do
         -- the remote program probably isn't fully-initialized yet, try again.
-        printf "remote address %s unreachable, retrying...\n" (unparseAddress remoteAddress)
+        printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
         threadDelay (1000 * 1000)  -- 1s
         return Nothing
       Left (TransportError _ err) ->

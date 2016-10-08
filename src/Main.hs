@@ -10,6 +10,7 @@ import           Options.Applicative (execParser)
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), Role(..), UserProvidedConfig(..))
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
+import           Text.Parsable
 
 
 server :: Address -> IO ()
@@ -42,5 +43,5 @@ main = do
               (FileProvidedConfig role myAddress)
               -> do
         case role of
-          Master -> join $ server <$> parseAddress myAddress
-          Slave  -> join $ client <$> parseAddress myAddress <*> parseAddress "localhost:8081:0"
+          Master -> join $ server <$> parse myAddress
+          Slave  -> join $ client <$> parse myAddress <*> parse "localhost:8081:0"

@@ -2,6 +2,8 @@ module Config where
 
 import Options.Applicative
 
+import Text.Parsable
+
 
 data Role
   = Master
@@ -26,11 +28,11 @@ data Command
   | RunNode   !UserProvidedConfig !FileProvidedConfig
 
 
-stringOption :: String -> String -> String -> Parser String
-stringOption long_ metavar_ help_ = strOption
-                                  $ long    long_
-                                 <> metavar metavar_
-                                 <> help    help_
+parsableOption :: Parsable a => String -> String -> String -> Parser a
+parsableOption long_ metavar_ help_ = option (eitherReader parse)
+                                    $ long    long_
+                                   <> metavar metavar_
+                                   <> help    help_
 
 configOption :: Read a => String -> String -> String -> Parser a
 configOption long_ metavar_ help_ = option auto
@@ -47,8 +49,8 @@ userParser = UserProvidedConfig
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
-         <$> configOption "role"      "Master|Slave" "exactly one node should be the master"
-         <*> stringOption "address"   "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
+         <$> configOption   "role"    "Master|Slave" "exactly one node should be the master"
+         <*> parsableOption "address" "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
 
 commandParser :: Parser Command
 commandParser = subparser

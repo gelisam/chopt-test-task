@@ -15,6 +15,7 @@ executable chopt-test-task
                      , Control.Monad.MyExtra
                      , Network.Transport.MyExtra
                      , Network.Transport.TCP.Address
+                     , Text.Parsable
   build-depends:       base >=4.8 && <4.9
                      , bytestring
                      , doctest
