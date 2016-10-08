@@ -1,4 +1,8 @@
-module Data.Binary.Strict where
+module Data.Binary.Strict
+  ( Lazy.Binary  -- re-export Binary so users don't need to also import the
+                 -- original Data.Binary
+  , module Data.Binary.Strict  -- also export the rest of the module as usual
+  ) where
 
 import qualified Data.Binary as Lazy
 import           Data.Binary (Binary)

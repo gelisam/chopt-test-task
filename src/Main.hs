@@ -1,15 +1,11 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import           Control.Monad
-import           Network.Transport
 import           Options.Applicative (execParser)
 import           Text.Printf
 
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
 import           Control.Monad.MyExtra
-import qualified Data.Binary.Strict as Binary
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
 import           Text.Parsable
@@ -23,22 +19,14 @@ runNode myAddress peerAddresses = do
     -- send a message to everyone
     let myMessage :: String
         myMessage = printf "hello from %s" (unparse myAddress)
-    forM_ connections $ \connection ->
-      join $ fromRightM <$> send connection [Binary.encode myMessage]
+    mapM_ (sendOne myMessage) connections
     
     -- receive a message from everyone
-    untilTotalM (length connections) $ receive endpoint >>= \case
-      Received _ encodedMessages -> do
-        forM_ encodedMessages $ \encodedMessage -> do
-          let message :: String
-              message = Binary.decode encodedMessage
-          printf "%s received %s\n" (unparse myAddress) (show message)
-        return (length encodedMessages)
-      ConnectionOpened {} ->
-        -- ignored
-        return 0
-      err -> do
-        fail (show err)
+    untilTotalM (length connections) $ do
+      messages <- receiveMany endpoint :: IO [String]
+      forM_ messages $ \message ->
+        printf "%s received %s\n" (unparse myAddress) (show message)
+      return (length messages)
 
 main :: IO ()
 main = do

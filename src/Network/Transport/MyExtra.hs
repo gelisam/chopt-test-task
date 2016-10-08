@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Network.Transport.MyExtra where
 
@@ -9,6 +10,8 @@ import           System.IO.Error (isAlreadyInUseError)
 import           Text.Printf
 
 import           Control.Monad.MyExtra
+import qualified Data.Binary.Strict as Binary
+import           Data.Binary.Strict (Binary)
 import           Network.Transport.TCP.Address
 import           Text.Parsable
 
@@ -47,3 +50,17 @@ connectStubbornly localEndpoint remoteAddress = untilNothingM $ do
         fail err
       Right connection ->
         return $ Just connection
+
+
+sendOne :: Binary a => a -> Connection -> IO ()
+sendOne x connection = join $ fromRightM <$> send connection [Binary.encode x]
+
+receiveMany :: Binary a => EndPoint -> IO [a]
+receiveMany localEndpoint = receive localEndpoint >>= \case
+    Received _ messages ->
+      return $ map Binary.decode messages
+    ConnectionOpened {} ->
+      -- ignore, wait for the real messages
+      receiveMany localEndpoint
+    err -> do
+      fail (show err)
