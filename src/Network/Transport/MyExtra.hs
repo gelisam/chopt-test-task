@@ -5,6 +5,7 @@ import           Control.Concurrent (threadDelay)
 import           Network.Transport
 import           Network.Transport.TCP (createTransport, defaultTCPParameters)
 import           System.IO.Error (isAlreadyInUseError)
+import           Text.Printf
 
 import           Control.Monad.MyExtra
 import           Network.Transport.TCP.Address
@@ -16,7 +17,7 @@ createTransportStubbornly (Address {..}) = untilM $ do
     case r of
       Left err | isAlreadyInUseError err -> do
         -- sometimes the OS keeps sockets busy for a minute after a server stops, try again
-        putStrLn "local port is busy, retrying..."
+        printf "local port %d is busy, retrying...\n" addressPort
         threadDelay (1000 * 1000)  -- 1s
         return Nothing
       Left err ->
@@ -30,7 +31,7 @@ connectStubbornly localEndpoint remoteAddress = untilM $ do
     case r of
       Left (TransportError ConnectNotFound _) -> do
         -- the remote program probably isn't fully-initialized yet, try again.
-        putStrLn "remote unreachable, retrying..."
+        printf "remote address %s unreachable, retrying...\n" (unparseAddress remoteAddress)
         threadDelay (1000 * 1000)  -- 1s
         return Nothing
       Left (TransportError _ err) ->

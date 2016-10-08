@@ -18,6 +18,7 @@ data Address = Address
   , addressChannel :: !Int
   }
 
+
 parseAddress :: Monad m => String -> m Address
 parseAddress s = s & splitOn ":" & \case
     [host, port, channel] -> Address
@@ -28,7 +29,11 @@ parseAddress s = s & splitOn ":" & \case
                        (show "localhost:8080:0")
                        (show s)
 
+unparseAddress :: Address -> String
+unparseAddress (Address {..}) = printf "%s:%d:0" addressHost addressPort
+
+
 endpointAddress :: Address -> EndPointAddress
-endpointAddress (Address {..}) = EndPointAddress
-                               $ ByteString.pack
-                               $ printf "%s:%d:0" addressHost addressPort
+endpointAddress = EndPointAddress
+                . ByteString.pack
+                . unparseAddress
