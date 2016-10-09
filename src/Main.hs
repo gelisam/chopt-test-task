@@ -8,19 +8,9 @@ import           Text.Printf
 import           Algorithm
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
 import           Interpreter
-import           Message
 import           Network.Transport.MyExtra
-import           Network.Transport.TCP.Address
-import           Program
 import           Text.Parsable
 
-
-runNode :: Int -> Int -> Address -> [Address] -> IO ()
-runNode nbNodes myIndex myAddress peerAddresses = do
-    endpoint <- createEndpointStubbornly myAddress
-    connections <- mapM (connectStubbornly endpoint) peerAddresses
-    
-    interpret nbNodes myIndex endpoint connections algorithm
 
 main :: IO ()
 main = do
@@ -34,9 +24,14 @@ main = do
               (FileProvidedConfig myAddress)
               -> do
         allAddresses <- join $ mapM parse <$> lines <$> readFile "nodelist.txt"
-        let nbNodes = length allAddresses
         myIndex <- case elemIndex myAddress allAddresses of
           Just x -> return x
           Nothing -> fail $ printf "%s is a valid address but it is not listed in nodelist.txt" (show myAddress)
+        
+        let nbNodes       = length allAddresses
         let peerAddresses = filter (/= myAddress) allAddresses
-        runNode nbNodes myIndex myAddress peerAddresses
+        
+        endpoint <- createEndpointStubbornly myAddress
+        connections <- mapM (connectStubbornly endpoint) peerAddresses
+        
+        interpret nbNodes myIndex endpoint connections algorithm
