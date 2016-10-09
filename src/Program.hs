@@ -43,26 +43,26 @@ instance Monad Program where
     Bind cr cc >>= f = Bind cr (fmap (>>= f) cc)
 
 
-command :: Command a -> Program a
-command cmd = Bind cmd Return
+liftCommand :: Command a -> Program a
+liftCommand cmd = Bind cmd Return
 
 debug :: String -> Program ()
-debug s = command $ Debug s
+debug s = liftCommand $ Debug s
 
 getNbNodes :: Program Int
-getNbNodes = command GetNbNodes
+getNbNodes = liftCommand GetNbNodes
 
 getMyNodeIndex :: Program Int
-getMyNodeIndex = command GetMyNodeIndex
+getMyNodeIndex = liftCommand GetMyNodeIndex
 
 generateRandomMessage :: Program Message
-generateRandomMessage = command GenerateRandomMessage
+generateRandomMessage = liftCommand GenerateRandomMessage
 
 broadcastContribution :: Contribution -> Program ()
-broadcastContribution contributions = command $ BroadcastContribution contributions
+broadcastContribution contributions = liftCommand $ BroadcastContribution contributions
 
 receiveContributions :: Program [Contribution]
-receiveContributions = command ReceiveContributions
+receiveContributions = liftCommand ReceiveContributions
 
 commit :: Message -> Program ()
-commit message = command $ Commit message
+commit message = liftCommand $ Commit message

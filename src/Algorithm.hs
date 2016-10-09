@@ -30,11 +30,11 @@ isRoundComplete status = do
 runRound :: RoundNumber -> Program Message
 runRound currentRoundNumber = do
     -- choose a candidate and send this contribution to everyone
-    myMessage <- command GenerateRandomMessage
+    myMessage <- generateRandomMessage
     myIndex <- getMyNodeIndex
     let myStatus = RoundStatus myMessage (bit myIndex)
     let myContribution = (currentRoundNumber, myStatus)
-    command $ BroadcastContribution myContribution
+    broadcastContribution myContribution
     
     -- collect the other contributions and return the best one
     go myStatus
