@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module Algorithm where
 
-import Prelude hiding (round)
+import Prelude hiding (log, round)
 
 import Control.Monad
 import Data.Bits
@@ -18,7 +18,7 @@ algorithm = do
       message <- runRound roundNumber
       
       myIndex <- getMyNodeIndex
-      debug $ printf "node #%d agrees: round %d's message is %s\n" myIndex roundNumber (show message)
+      log 1 $ printf "node #%d agrees: round %d's message is %s" myIndex roundNumber (show message)
 
 -- the round is complete when the information is accumulated, that is, once we've
 -- combined the candidate messages from all the contributors.
@@ -34,6 +34,8 @@ runRound currentRoundNumber = do
     myIndex <- getMyNodeIndex
     let myStatus = RoundStatus myMessage (bit myIndex)
     let myContribution = (currentRoundNumber, myStatus)
+    
+    log 3 $ printf "node #%d sends %s" myIndex (show myStatus)
     broadcastContribution myContribution
     
     -- collect the other contributions and return the best one
@@ -50,7 +52,7 @@ runRound currentRoundNumber = do
           let newStatus = mconcat (status:statuses)
           
           myIndex <- getMyNodeIndex
-          debug $ printf "node #%d %s => %s\n" myIndex (show status) (show newStatus)
+          log 3 $ printf "node #%d %s => %s" myIndex (show status) (show newStatus)
           
           go newStatus
     

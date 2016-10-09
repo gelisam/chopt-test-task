@@ -16,6 +16,7 @@ executable chopt-test-task
                      , Control.Monad.MyExtra
                      , Data.Binary.Strict
                      , Interpreter
+                     , Log
                      , Message
                      , Network.Transport.MyExtra
                      , Network.Transport.TCP.Address

@@ -7,6 +7,7 @@ module Program where
 
 import Control.Monad (ap)
 
+import Log
 import Message
 
 
@@ -17,7 +18,7 @@ type Contribution = (RoundNumber, RoundStatus)
 -- type, not by the output type of a post-computation we stick after every command just
 -- so we can implement Functor.
 data Command a where
-    Debug :: String -> Command ()
+    Log :: Verbosity -> String -> Command ()
     GetNbNodes :: Command Int
     GetMyNodeIndex :: Command Int  -- between 0 and NbNodes-1
     GenerateRandomMessage :: Command Message
@@ -46,8 +47,8 @@ instance Monad Program where
 liftCommand :: Command a -> Program a
 liftCommand cmd = Bind cmd Return
 
-debug :: String -> Program ()
-debug s = liftCommand $ Debug s
+log :: Verbosity -> String -> Program ()
+log v s = liftCommand $ Log v s
 
 getNbNodes :: Program Int
 getNbNodes = liftCommand GetNbNodes

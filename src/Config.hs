@@ -10,6 +10,7 @@ data UserProvidedConfig = UserProvidedConfig
   { configMessageSendingDuration :: !Int
   , configGracePeriodDuration    :: !Int
   , configRandomSeed             :: !Int
+  , configVerbosity              :: !Int
   }
   deriving (Eq, Show)
 
@@ -41,6 +42,7 @@ userParser = UserProvidedConfig
          <$> configOption "send-for"  "SECONDS"      "duration of the message-sending period"
          <*> configOption "wait-for"  "SECONDS"      "duration of the grace period"
          <*> configOption "with-seed" "INTEGER"      "fixes all the random decisions"
+         <*> configOption "verbosity" "INTEGER"      "0 for quiet, ..., 3 to trace each communication attempt"
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
