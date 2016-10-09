@@ -1,32 +1,25 @@
 module Main where
 
 import           Control.Monad
+import           Data.List
 import           Options.Applicative (execParser)
 import           Text.Printf
 
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
-import           Control.Monad.MyExtra
 import           Message
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
 import           Text.Parsable
 
 
-runNode :: Address -> [Address] -> IO ()
-runNode myAddress peerAddresses = do
+runNode :: Int -> Int -> Address -> [Address] -> IO ()
+runNode nbNodes myIndex myAddress peerAddresses = do
     endpoint <- createEndpointStubbornly myAddress
     connections <- mapM (connectStubbornly endpoint) peerAddresses
     
-    -- send a message to everyone
-    myMessage <- randomMessage
-    mapM_ (sendOne myMessage) connections
-    
-    -- receive a message from everyone
-    untilTotalM (length connections) $ do
-      messages <- receiveMany endpoint :: IO [Message]
-      forM_ messages $ \message ->
-        printf "%s received %s\n" (unparse myAddress) (show message)
-      return (length messages)
+    forM_ [0..] $ \roundNumber -> do
+      message <- runRound nbNodes myIndex endpoint connections roundNumber
+      printf "node #%d agrees: round %d's message is %s\n" myIndex roundNumber (show message)
 
 main :: IO ()
 main = do
@@ -40,5 +33,9 @@ main = do
               (FileProvidedConfig myAddress)
               -> do
         allAddresses <- join $ mapM parse <$> lines <$> readFile "nodelist.txt"
+        let nbNodes = length allAddresses
+        myIndex <- case elemIndex myAddress allAddresses of
+          Just x -> return x
+          Nothing -> fail $ printf "%s is a valid address but it is not listed in nodelist.txt" (show myAddress)
         let peerAddresses = filter (/= myAddress) allAddresses
-        runNode myAddress peerAddresses
+        runNode nbNodes myIndex myAddress peerAddresses
