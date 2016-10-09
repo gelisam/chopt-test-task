@@ -11,12 +11,15 @@ cabal-version:       >=1.10
 
 executable chopt-test-task
   main-is:             Main.hs
-  other-modules:       Config
+  other-modules:       Algorithm
+                     , Config
                      , Control.Monad.MyExtra
                      , Data.Binary.Strict
+                     , Interpreter
                      , Message
                      , Network.Transport.MyExtra
                      , Network.Transport.TCP.Address
+                     , Program
                      , Text.Parsable
   build-depends:       base >=4.8 && <4.9
                      , binary

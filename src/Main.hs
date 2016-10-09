@@ -5,10 +5,13 @@ import           Data.List
 import           Options.Applicative (execParser)
 import           Text.Printf
 
+import           Algorithm
 import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
+import           Interpreter
 import           Message
 import           Network.Transport.MyExtra
 import           Network.Transport.TCP.Address
+import           Program
 import           Text.Parsable
 
 
@@ -17,9 +20,7 @@ runNode nbNodes myIndex myAddress peerAddresses = do
     endpoint <- createEndpointStubbornly myAddress
     connections <- mapM (connectStubbornly endpoint) peerAddresses
     
-    forM_ [0..] $ \roundNumber -> do
-      message <- runRound nbNodes myIndex endpoint connections roundNumber
-      printf "node #%d agrees: round %d's message is %s\n" myIndex roundNumber (show message)
+    interpret nbNodes myIndex endpoint connections algorithm
 
 main :: IO ()
 main = do

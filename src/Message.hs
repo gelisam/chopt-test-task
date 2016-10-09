@@ -49,33 +49,5 @@ instance Monoid RoundStatus where
         
         allContributors = c1 .|. c2
 
--- the round is complete when the information is accumulated, that is, once we've
--- combined the candidate messages from all the contributors.
-isRoundComplete :: Int -> RoundStatus -> Bool
-isRoundComplete nbNodes = (== nbNodes) . popCount . roundContributors
-
-
-type RoundNumber = Int
-type Contribution = (RoundNumber, RoundStatus)
-
-runRound :: Int -> Int -> EndPoint -> [Connection] -> RoundNumber -> IO Message
-runRound nbNodes myIndex endpoint connections currentRoundNumber = do
-    -- choose a candidate and send it to everyone
-    myMessage <- randomMessage
-    let myStatus = RoundStatus myMessage (bit myIndex)
-    let myContribution = (currentRoundNumber, myStatus)
-    mapM_ (sendOne myContribution) connections
-    
-    -- collect the other contributions and return the best one
-    go myStatus
-  where
-    go :: RoundStatus -> IO Message
-    go !status | isRoundComplete nbNodes status = return $ roundMessage status
-               | otherwise = do
-        statuses <- map snd <$> filter current <$> receiveMany endpoint
-        let newStatus = mconcat (status:statuses)
-        printf "node #%d %s => %s\n" myIndex (show status) (show newStatus)
-        go newStatus
-    
-    current :: Contribution -> Bool
-    current (roundNumber, _) = roundNumber == currentRoundNumber
+countRoundContributors :: RoundStatus -> Int
+countRoundContributors = popCount . roundContributors
