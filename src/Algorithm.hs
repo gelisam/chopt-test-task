@@ -4,7 +4,8 @@ module Algorithm where
 import Prelude hiding (log, round)
 
 import Control.Monad
-import Data.Bits
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.State.Strict
 import Text.Printf
 
 import Program
@@ -12,49 +13,53 @@ import Message
 
 
 -- runs forever
-algorithm :: Program ()
+algorithm :: Program void
 algorithm = do
-    forM_ [0..] $ \roundNumber -> do
-      message <- runRound roundNumber
-      
-      myIndex <- getMyNodeIndex
-      log 1 $ printf "node #%d agrees: round %d's message is %s" myIndex roundNumber (show message)
-
--- the round is complete when the information is accumulated, that is, once we've
--- combined the candidate messages from all the contributors.
-isRoundComplete :: RoundStatus -> Program Bool
-isRoundComplete status = do
-    nbNodes <- getNbNodes
-    return $ countRoundContributors status == nbNodes
-
-runRound :: RoundNumber -> Program Message
-runRound currentRoundNumber = do
-    -- choose a candidate and send this contribution to everyone
-    myMessage <- generateRandomMessage
-    myIndex <- getMyNodeIndex
-    let myStatus = RoundStatus myMessage (bit myIndex)
-    let myContribution = (currentRoundNumber, myStatus)
+    status0 <- initialOverallStatus <$> getNbNodes
+                                    <*> getMyNodeIndex
+                                    <*> generateRandomMessage
+                                    <*> generateRandomMessage
     
-    log 3 $ printf "node #%d sends %s" myIndex (show myStatus)
-    broadcastContribution myContribution
+    flip evalStateT status0 $ forever $ do
+      message <- runRound
+      lift $ commit message
+      
+      myIndex <- lift getMyNodeIndex
+      roundNumber <- currentRoundNumber <$> get
+      lift $ log 1 $ printf "node #%d agrees: round %d's message is %s"
+                            myIndex
+                            roundNumber
+                            (show message)
+      
+      nextCandidate <- lift generateRandomMessage
+      modify $ moveToNextRound nextCandidate
+
+runRound :: StateT OverallStatus Program Message
+runRound = do
+    -- at this point, we have already chosen a message. share it with everywone.
+    myContribution <- currentContribution <$> get
+    lift $ broadcastContribution myContribution
+    
+    myIndex <- lift getMyNodeIndex
+    lift $ log 3 $ printf "node #%d sends %s" myIndex (show myContribution)
     
     -- collect the other contributions and return the best one
-    go myStatus
+    loop
   where
-    go :: RoundStatus -> Program Message
-    go !status = do
-        isComplete <- isRoundComplete status
+    loop :: StateT OverallStatus Program Message
+    loop = do
+        isComplete <- isCurrentRoundComplete <$> get
         if isComplete
         then
-          return $ roundMessage status
+          bestMessageForCurrentRound <$> get
         else do
-          statuses <- map snd <$> filter current <$> receiveContributions
-          let newStatus = mconcat (status:statuses)
+          contributions <- lift receiveContributions
+          mapM_ (modify . collectContribution) contributions
           
-          myIndex <- getMyNodeIndex
-          log 3 $ printf "node #%d %s => %s" myIndex (show status) (show newStatus)
+          myIndex <- lift getMyNodeIndex
+          forM_ contributions $ \contribution ->
+            lift $ log 3 $ printf "node #%d received %s" myIndex (show contribution)
+          newStatus <- get
+          lift $ log 2 $ printf "node #%d now at %s" myIndex (show newStatus)
           
-          go newStatus
-    
-    current :: Contribution -> Bool
-    current (roundNumber, _) = roundNumber == currentRoundNumber
+          loop

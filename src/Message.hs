@@ -1,17 +1,18 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 module Message where
 
 import Prelude hiding (round)
 
 import Data.Bits
+import Data.Monoid
+import Data.Sequence
 import GHC.Generics
-import Network.Transport
 import System.Random
 import Text.Printf
 
 import Data.Binary.Strict
-import Network.Transport.MyExtra
 
 
 type Message = Double
@@ -49,5 +50,68 @@ instance Monoid RoundStatus where
         
         allContributors = c1 .|. c2
 
+initialRoundStatus :: Int -> Message -> RoundStatus
+initialRoundStatus myIndex message
+  = RoundStatus { roundMessage      = message
+                , roundContributors = bit myIndex  -- we only know about our own contribution
+                }
+
 countRoundContributors :: RoundStatus -> Int
 countRoundContributors = popCount . roundContributors
+
+
+type RoundNumber = Int
+
+data OverallStatus = OverallStatus
+  { numberOfNodes      :: !Int
+  , indexOfCurrentNode :: !Int  -- between 0 and numberOfNodes-1
+  , previousRounds     :: !(Seq Message)
+  , currentRoundNumber :: !RoundNumber
+  , currentRoundStatus :: !RoundStatus
+  , nextRoundStatus    :: !RoundStatus
+  }
+  deriving (Eq, Show)
+
+initialOverallStatus :: Int -> Int -> Message -> Message -> OverallStatus
+initialOverallStatus nbNodes myIndex message1 message2
+  = OverallStatus { numberOfNodes      = nbNodes
+                  , indexOfCurrentNode = myIndex
+                  , previousRounds     = mempty
+                  , currentRoundNumber = 0
+                  , currentRoundStatus = initialRoundStatus myIndex message1
+                  , nextRoundStatus    = initialRoundStatus myIndex message2
+                  }
+
+-- the round is complete when all the information is accumulated, that is, once we've
+-- combined the candidate messages from all the contributors.
+isCurrentRoundComplete :: OverallStatus -> Bool
+isCurrentRoundComplete (OverallStatus {..})
+  = countRoundContributors currentRoundStatus == numberOfNodes
+
+bestMessageForCurrentRound :: OverallStatus -> Message
+bestMessageForCurrentRound = roundMessage . currentRoundStatus
+
+moveToNextRound :: Message -> OverallStatus -> OverallStatus
+moveToNextRound nextCandidate o@(OverallStatus {..})
+  = o { previousRounds     = previousRounds |> bestMessageForCurrentRound o
+      , currentRoundNumber = currentRoundNumber + 1
+      , currentRoundStatus = nextRoundStatus
+      , nextRoundStatus    = initialRoundStatus indexOfCurrentNode nextCandidate
+      }
+
+
+type Contribution = (RoundNumber, RoundStatus)
+
+currentContribution :: OverallStatus -> Contribution
+currentContribution (OverallStatus {..}) = (currentRoundNumber, currentRoundStatus)
+
+collectContribution :: Contribution -> OverallStatus -> OverallStatus
+collectContribution c@(roundNumber, status) o@(OverallStatus {..})
+  | roundNumber == currentRoundNumber     = o { currentRoundStatus = currentRoundStatus <> status }
+  | roundNumber == currentRoundNumber + 1 = o { nextRoundStatus    = nextRoundStatus    <> status }
+  | roundNumber >  currentRoundNumber + 1 =
+      error $ printf "the algorithm is broken! contribution %s should never have been sent since round %d is not yet decided"
+                     (show c)
+                     currentRoundNumber
+  | otherwise =
+      o  -- ignore contributions about already-decided rounds

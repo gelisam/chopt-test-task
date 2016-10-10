@@ -11,9 +11,6 @@ import Log
 import Message
 
 
-type RoundNumber = Int
-type Contribution = (RoundNumber, RoundStatus)
-
 -- I'm not using Control.Monad.Free because I want Commands to be indexed by their output
 -- type, not by the output type of a post-computation we stick after every command just
 -- so we can implement Functor.
