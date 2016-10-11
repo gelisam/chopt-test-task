@@ -19,11 +19,7 @@ main = do
       CheckArgs _ ->
         -- if the arguments were incorrect, 'execParser' would have complained.
         return ()
-      RunNode (UserProvidedConfig messageSendingDuration gracePeriodDuration
-                                  randomSeed
-                                  verbosity)
-              (FileProvidedConfig myAddress)
-              -> do
+      RunNode userConfig (FileProvidedConfig myAddress) -> do
         allAddresses <- join $ mapM parse <$> lines <$> readFile "nodelist.txt"
         myIndex <- case elemIndex myAddress allAddresses of
           Just x -> return x
@@ -35,4 +31,4 @@ main = do
         endpoint <- createEndpointStubbornly myAddress
         connections <- mapM (connectStubbornly endpoint) peerAddresses
         
-        interpret verbosity nbNodes myIndex endpoint connections algorithm
+        interpret userConfig nbNodes myIndex endpoint connections algorithm
