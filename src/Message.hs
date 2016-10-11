@@ -5,6 +5,7 @@ module Message where
 
 import Prelude hiding (round)
 
+import Control.Monad.Trans.State
 import Data.Bits
 import Data.Monoid
 import Data.Sequence
@@ -17,8 +18,8 @@ import Data.Binary.Strict
 
 type Message = Double
 
-randomMessage :: IO Message
-randomMessage = randomRIO (0, 1)
+randomMessage :: Monad m => StateT StdGen m Message
+randomMessage = state $ randomR (0, 1)
 
 
 type BitSet = Integer 
