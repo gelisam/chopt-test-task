@@ -55,12 +55,15 @@ connectStubbornly localEndpoint remoteAddress = untilJustM $ do
 sendOne :: Binary a => a -> Connection -> IO ()
 sendOne x connection = join $ fromRightM <$> send connection [Binary.encode x]
 
-receiveMany :: Binary a => EndPoint -> IO [a]
+receiveMany :: Binary a => EndPoint -> IO (Either Address [a])
 receiveMany localEndpoint = receive localEndpoint >>= \case
     Received _ messages ->
-      return $ map Binary.decode messages
+      return $ Right $ map Binary.decode messages
     ConnectionOpened {} ->
       -- ignore, wait for the real messages
       receiveMany localEndpoint
+    ErrorEvent (TransportError (EventConnectionLost lostEndpointAddress) _) ->
+      Left <$> parseEndpointAddress lostEndpointAddress
     err -> do
+      -- some unexpected event we're not prepared to handle
       fail (show err)

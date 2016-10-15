@@ -87,37 +87,47 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
     go1 (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> liftIO $ mapM_ (sendOne (ProcessContribution c)) connections
         False -> return ()
-    go1 ReceiveContribution       = use pendingActions >>= \case
+    go1 ReceiveContribution       = receiveContribution
+    go1 (Commit m)                = do
+        committedMessages %= (|> m)
+        i <- length <$> use committedMessages
+        committedScore += (fromIntegral i * m)
+    
+    receiveContribution :: MaybeT M (Maybe Contribution)
+    receiveContribution = use pendingActions >>= \case
         Nothing -> do
           -- we have not called 'receiveMany' yet, do it now
-          cs <- liftIO $ receiveMany endpoint
-          pendingActions .= Just cs
-          go1 ReceiveContribution
+          r <- liftIO $ receiveMany endpoint
+          case r of
+            Right cs -> do
+              pendingActions .= Just cs
+              receiveContribution
+            Left lostAddress ->
+              -- we don't support broken connections yet, so let's assume the connection broke
+              -- because that other node has terminated, and let's terminate too.
+              terminate
         Just (ProcessContribution c:cs) -> do
           pendingActions .= Just cs
           return (Just c)
         Just (StopSendingNow:cs) -> do
           pendingActions .= Just cs
           canSendContributions .= False
-          go1 ReceiveContribution
-        Just (PrintResultNow:cs) -> do
-          pendingActions .= Just cs
-          
-          ms <- toList <$> use committedMessages
-          s <- use committedScore
-          liftIO $ print (ms, s)
-          
-          -- abort the @MaybeT M a@ computation
-          fail "the program has terminated"
+          receiveContribution
+        Just (PrintResultNow:_) -> terminate
         Just [] -> do
           -- reset to 'Nothing' so the next call blocks with 'receiveMany' again, and
           -- tell 'receiveContributions' that the list is over
           pendingActions .= Nothing
           return Nothing
-    go1 (Commit m)                = do
-        committedMessages %= (|> m)
-        i <- length <$> use committedMessages
-        committedScore += (fromIntegral i * m)
+    
+    terminate :: MaybeT M a
+    terminate = do
+        ms <- toList <$> use committedMessages
+        s <- use committedScore
+        liftIO $ print (ms, s)
+        
+        -- abort the @MaybeT M a@ computation
+        fail "the program has terminated"
     
     go :: Program Void -> M ()
     go = untilNothingM $ \case

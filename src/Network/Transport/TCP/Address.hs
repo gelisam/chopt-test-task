@@ -36,3 +36,8 @@ endpointAddress :: Address -> EndPointAddress
 endpointAddress = EndPointAddress
                 . ByteString.pack
                 . unparse
+
+parseEndpointAddress :: Monad m => EndPointAddress -> m Address
+parseEndpointAddress = parse
+                     . ByteString.unpack
+                     . endPointAddressToByteString
