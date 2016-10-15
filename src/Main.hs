@@ -31,4 +31,4 @@ main = do
         endpoint <- createEndpointStubbornly myAddress
         connections <- mapM (connectStubbornly endpoint) peerAddresses
         
-        interpret userConfig nbNodes myIndex endpoint connections algorithm
+        interpret userConfig nbNodes myIndex myAddress endpoint connections algorithm
