@@ -5,7 +5,7 @@ module Message where
 
 import Prelude hiding (round)
 
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 import Data.Bits
 import Data.Monoid
 import Data.Sequence

@@ -5,7 +5,7 @@ module Interpreter where
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 import Network.Transport
 import System.Random
 
