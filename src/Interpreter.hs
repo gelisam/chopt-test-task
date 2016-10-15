@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
-module Interpreter where
+module Interpreter (interpret) where
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
@@ -16,10 +16,23 @@ import Network.Transport.MyExtra
 import Program
 
 
+data InterpreterState = InterpreterState
+  { pendingContributions :: Maybe [Contribution]  -- received but not yet passed on to the Program.
+                                                  -- @Nothing@ means we should call 'receiveMany',
+                                                  -- @Just []@ means we should tell the Program it's the end of the list
+  }
+  deriving (Eq, Show)
+
+initialInterpreterState :: InterpreterState
+initialInterpreterState = InterpreterState
+                        { pendingContributions = Nothing
+                        }
+
+
 interpret :: UserProvidedConfig -> Int -> NodeIndex -> EndPoint -> [Connection] -> Program a -> IO a
 interpret (UserProvidedConfig {..}) nbNodes myIndex endpoint connections
   = flip evalStateT (mkStdGen mySeed)
-  . flip evalStateT Nothing
+  . flip evalStateT initialInterpreterState
   . go
   where
     -- combine the shared configRandomSeed with the node index so that each node uses a different
@@ -27,30 +40,30 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex endpoint connections
     mySeed :: Int
     mySeed = configRandomSeed + myIndex
     
-    go1 :: Command a -> StateT (Maybe [Contribution]) (StateT StdGen IO) a
+    go1 :: Command a -> StateT InterpreterState (StateT StdGen IO) a
     go1 (Log v s)                 = liftIO $ putLogLn configVerbosity v s
     go1 GetNbNodes                = return nbNodes
     go1 GetMyNodeIndex            = return myIndex
     go1 GenerateRandomMessage     = lift randomMessage
     go1 (BroadcastContribution c) = liftIO $ mapM_ (sendOne c) connections
-    go1 ReceiveContribution       = get >>= \case
+    go1 ReceiveContribution       = (pendingContributions <$> get) >>= \case
         Nothing -> do
           -- we have not called 'receiveMany' yet, do it now
           cs <- liftIO $ receiveMany endpoint
-          put $ Just cs
+          modify $ \s -> s { pendingContributions = Just cs }
           go1 ReceiveContribution
           -- cs is non-empty, "fall through" to the next line
         Just (c:cs) -> do
-          put (Just cs)
+          modify $ \s -> s { pendingContributions = Just cs }
           return (Just c)
         Just [] -> do
           -- reset to 'Nothing' so the next call blocks with 'receiveMany' again, and
           -- tell 'receiveContributions' that the list is over
-          put Nothing
+          modify $ \s -> s { pendingContributions = Nothing }
           return Nothing
     go1 (Commit _)                = return ()
     
-    go :: Program a -> StateT (Maybe [Contribution]) (StateT StdGen IO) a
+    go :: Program a -> StateT InterpreterState (StateT StdGen IO) a
     go (Return x) = return x
     go (Bind cr cc) = do
       r <- go1 cr
