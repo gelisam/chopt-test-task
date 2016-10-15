@@ -16,8 +16,13 @@ import Program
 
 interpret :: UserProvidedConfig -> Int -> NodeIndex -> EndPoint -> [Connection] -> Program a -> IO a
 interpret (UserProvidedConfig {..}) nbNodes myIndex endpoint connections
-  = flip evalStateT (mkStdGen configRandomSeed) . go
+  = flip evalStateT (mkStdGen mySeed) . go
   where
+    -- combine the shared configRandomSeed with the node index so that each node uses a different
+    -- sequence of messages
+    mySeed :: Int
+    mySeed = configRandomSeed + myIndex
+    
     go1 :: Command a -> StateT StdGen IO a
     go1 (Log v s)                 = lift $ putLogLn configVerbosity v s
     go1 GetNbNodes                = return nbNodes
