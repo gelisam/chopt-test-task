@@ -20,12 +20,14 @@ data InterpreterState = InterpreterState
   { pendingContributions :: Maybe [Contribution]  -- received but not yet passed on to the Program.
                                                   -- @Nothing@ means we should call 'receiveMany',
                                                   -- @Just []@ means we should tell the Program it's the end of the list
+  , canSendContributions :: Bool
   }
   deriving (Eq, Show)
 
 initialInterpreterState :: InterpreterState
 initialInterpreterState = InterpreterState
                         { pendingContributions = Nothing
+                        , canSendContributions = True
                         }
 
 
@@ -45,7 +47,9 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex endpoint connections
     go1 GetNbNodes                = return nbNodes
     go1 GetMyNodeIndex            = return myIndex
     go1 GenerateRandomMessage     = lift randomMessage
-    go1 (BroadcastContribution c) = liftIO $ mapM_ (sendOne c) connections
+    go1 (BroadcastContribution c) = (canSendContributions <$> get) >>= \case
+        True  -> liftIO $ mapM_ (sendOne c) connections
+        False -> return ()
     go1 ReceiveContribution       = (pendingContributions <$> get) >>= \case
         Nothing -> do
           -- we have not called 'receiveMany' yet, do it now
