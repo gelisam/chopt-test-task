@@ -44,7 +44,7 @@ userParser = UserProvidedConfig
          <$> (seconds <$> configOption "send-for"  "SECONDS"      "duration of the message-sending period")
          <*> (seconds <$> configOption "wait-for"  "SECONDS"      "duration of the grace period")
          <*> configOption              "with-seed" "INTEGER"      "fixes all the random decisions"
-         <*> configOption              "verbosity" "INTEGER"      "0 for quiet, ..., 3 to trace each communication attempt"
+         <*> configOption              "verbosity" "INTEGER"      "0 for quiet, ..., 4 to trace each communication attempt"
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig

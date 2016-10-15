@@ -26,7 +26,7 @@ algorithm = do
       
       myIndex <- lift getMyNodeIndex
       roundNumber <- currentRoundNumber <$> get
-      lift $ log 1 $ printf "node #%d agrees: round %d's message is %s"
+      lift $ log 2 $ printf "node #%d agrees: round %d's message is %s"
                             myIndex
                             roundNumber
                             (show message)
@@ -41,7 +41,7 @@ runRound = do
     lift $ broadcastContribution myContribution
     
     myIndex <- lift getMyNodeIndex
-    lift $ log 3 $ printf "node #%d sends %s" myIndex (show myContribution)
+    lift $ log 4 $ printf "node #%d sends %s" myIndex (show myContribution)
     
     -- collect the other contributions and return the best one
     loop
@@ -58,8 +58,8 @@ runRound = do
           
           myIndex <- lift getMyNodeIndex
           forM_ contributions $ \contribution ->
-            lift $ log 3 $ printf "node #%d received %s" myIndex (show contribution)
+            lift $ log 4 $ printf "node #%d received %s" myIndex (show contribution)
           newStatus <- get
-          lift $ log 2 $ printf "node #%d now at %s" myIndex (show newStatus)
+          lift $ log 3 $ printf "node #%d now at %s" myIndex (show newStatus)
           
           loop
