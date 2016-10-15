@@ -1,5 +1,6 @@
 module Config where
 
+import Control.Distributed.Process.Extras.Time
 import Options.Applicative
 
 import Log
@@ -8,8 +9,8 @@ import Text.Parsable
 
 
 data UserProvidedConfig = UserProvidedConfig
-  { configMessageSendingDuration :: !Int
-  , configGracePeriodDuration    :: !Int
+  { configMessageSendingDuration :: !TimeInterval
+  , configGracePeriodDuration    :: !TimeInterval
   , configRandomSeed             :: !Int
   , configVerbosity              :: !Verbosity
   }
@@ -40,14 +41,14 @@ configOption long_ metavar_ help_ = option auto
 
 userParser :: Parser UserProvidedConfig
 userParser = UserProvidedConfig
-         <$> configOption "send-for"  "SECONDS"      "duration of the message-sending period"
-         <*> configOption "wait-for"  "SECONDS"      "duration of the grace period"
-         <*> configOption "with-seed" "INTEGER"      "fixes all the random decisions"
-         <*> configOption "verbosity" "INTEGER"      "0 for quiet, ..., 3 to trace each communication attempt"
+         <$> (seconds <$> configOption "send-for"  "SECONDS"      "duration of the message-sending period")
+         <*> (seconds <$> configOption "wait-for"  "SECONDS"      "duration of the grace period")
+         <*> configOption              "with-seed" "INTEGER"      "fixes all the random decisions"
+         <*> configOption              "verbosity" "INTEGER"      "0 for quiet, ..., 3 to trace each communication attempt"
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
-         <$> parsableOption "address" "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
+         <$> parsableOption            "address"   "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
 
 commandParser :: Parser Command
 commandParser = subparser

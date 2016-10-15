@@ -28,6 +28,7 @@ executable chopt-test-task
                      , containers
                      , doctest
                      , distributed-process
+                     , distributed-process-extras
                      , network-transport
                      , network-transport-tcp
                      , optparse-applicative
