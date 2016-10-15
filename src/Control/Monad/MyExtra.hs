@@ -31,8 +31,8 @@ readM s = reads s & \case
                               (show $ typeRep (Proxy :: Proxy a))
                               (show s)
 
--- run the body until it return 'Nothing'
-untilNothingM :: Monad m => m (Maybe a) -> m a
-untilNothingM body = body >>= \case
-    Nothing -> untilNothingM body
+-- run the body until it return 'Just'
+untilJustM :: Monad m => m (Maybe a) -> m a
+untilJustM body = body >>= \case
+    Nothing -> untilJustM body
     Just x  -> return x

@@ -17,7 +17,7 @@ import           Text.Parsable
 
 
 createEndpointStubbornly :: Address -> IO EndPoint
-createEndpointStubbornly expectedAddress@(Address {..}) = untilNothingM $ do
+createEndpointStubbornly expectedAddress@(Address {..}) = untilJustM $ do
     r <- createTransport addressHost (show addressPort) defaultTCPParameters
     case r of
       Left err | isAlreadyInUseError err -> do
@@ -38,7 +38,7 @@ createEndpointStubbornly expectedAddress@(Address {..}) = untilNothingM $ do
                         (show $ unparse expectedAddress)
 
 connectStubbornly :: EndPoint -> Address -> IO Connection
-connectStubbornly localEndpoint remoteAddress = untilNothingM $ do
+connectStubbornly localEndpoint remoteAddress = untilJustM $ do
     r <- connect localEndpoint (endpointAddress remoteAddress) ReliableOrdered defaultConnectHints
     case r of
       Left (TransportError ConnectNotFound _) -> do
