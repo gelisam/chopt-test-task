@@ -11,11 +11,13 @@ import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
+import Data.Void
 import GHC.Generics
 import Network.Transport
 import System.Random
 
 import Config hiding (Command)
+import Control.Monad.MyExtra
 import Data.Binary.Strict
 import Log
 import Message
@@ -51,7 +53,7 @@ initialInterpreterState = InterpreterState
 makeLenses ''InterpreterState
 
 
-interpret :: UserProvidedConfig -> Int -> NodeIndex -> Address -> EndPoint -> [Connection] -> Program a -> IO a
+interpret :: UserProvidedConfig -> Int -> NodeIndex -> Address -> EndPoint -> [Connection] -> Program Void -> IO ()
 interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connections program = do
     _ <- forkIO timeKeeper
     runStateTs (go program)
@@ -93,11 +95,12 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
           return Nothing
     go1 (Commit _)                = return ()
     
-    go :: Program a -> StateT InterpreterState (StateT StdGen IO) a
-    go (Return x) = return x
-    go (Bind cr cc) = do
-      r <- go1 cr
-      go (cc r)
+    go :: Program Void -> StateT InterpreterState (StateT StdGen IO) ()
+    go = untilNothingM $ \case
+        Return void -> absurd void
+        Bind cr cc -> do
+          r <- go1 cr
+          return $ Just (cc r)
     
     timeKeeper :: IO ()
     timeKeeper = do

@@ -6,6 +6,7 @@ import Prelude hiding (log, round)
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
+import Data.Void
 import Text.Printf
 
 import Program
@@ -13,7 +14,7 @@ import Message
 
 
 -- runs forever
-algorithm :: Program void
+algorithm :: Program Void
 algorithm = do
     status0 <- initialOverallStatus <$> getNbNodes
                                     <*> getMyNodeIndex
