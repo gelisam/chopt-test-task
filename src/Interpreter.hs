@@ -53,21 +53,25 @@ initialInterpreterState = InterpreterState
 makeLenses ''InterpreterState
 
 
+-- the interpreter's monad transformer stack: its state, the random number's state, and IO
+type M a = StateT InterpreterState (StateT StdGen IO) a
+
+runM :: Int -> M a -> IO a
+runM seed = flip evalStateT (mkStdGen seed)
+          . flip evalStateT initialInterpreterState
+
+
 interpret :: UserProvidedConfig -> Int -> NodeIndex -> Address -> EndPoint -> [Connection] -> Program Void -> IO ()
 interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connections program = do
     _ <- forkIO timeKeeper
-    runStateTs (go program)
+    runM mySeed (go program)
   where
-    runStateTs :: StateT InterpreterState (StateT StdGen IO) a -> IO a
-    runStateTs = flip evalStateT (mkStdGen mySeed)
-               . flip evalStateT initialInterpreterState
-    
     -- combine the shared configRandomSeed with the node index so that each node uses a different
     -- sequence of messages
     mySeed :: Int
     mySeed = configRandomSeed + myIndex
     
-    go1 :: Command a -> StateT InterpreterState (StateT StdGen IO) a
+    go1 :: Command a -> M a
     go1 (Log v s)                 = liftIO $ putLogLn configVerbosity v s
     go1 GetNbNodes                = return nbNodes
     go1 GetMyNodeIndex            = return myIndex
@@ -95,7 +99,7 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
           return Nothing
     go1 (Commit _)                = return ()
     
-    go :: Program Void -> StateT InterpreterState (StateT StdGen IO) ()
+    go :: Program Void -> M ()
     go = untilNothingM $ \case
         Return void -> absurd void
         Bind cr cc -> do
