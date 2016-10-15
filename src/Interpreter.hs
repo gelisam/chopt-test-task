@@ -122,9 +122,16 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
     
     terminate :: MaybeT M a
     terminate = do
-        ms <- toList <$> use committedMessages
-        s <- use committedScore
-        liftIO $ print (ms, s)
+        liftIO $ putLogLn configVerbosity 1 $ "final result:"
+        
+        if configOmitMessageList
+        then do
+          result <- use committedScore
+          liftIO $ print result
+        else do
+          ms <- toList <$> use committedMessages
+          s <- use committedScore
+          liftIO $ print (ms, s)
         
         -- abort the @MaybeT M a@ computation
         fail "the program has terminated"

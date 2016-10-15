@@ -13,6 +13,7 @@ data UserProvidedConfig = UserProvidedConfig
   , configGracePeriodDuration    :: !TimeInterval
   , configRandomSeed             :: !Int
   , configVerbosity              :: !Verbosity
+  , configOmitMessageList        :: !Bool
   }
   deriving (Eq, Show)
 
@@ -38,17 +39,23 @@ configOption long_ metavar_ help_ = option auto
                                  <> metavar metavar_
                                  <> help    help_
 
+configFlag :: String -> String -> Parser Bool
+configFlag long_ help_ = flag False True
+                       $ long long_
+                      <> help help_
+
 
 userParser :: Parser UserProvidedConfig
 userParser = UserProvidedConfig
-         <$> (seconds <$> configOption "send-for"  "SECONDS"      "duration of the message-sending period")
-         <*> (seconds <$> configOption "wait-for"  "SECONDS"      "duration of the grace period")
-         <*> configOption              "with-seed" "INTEGER"      "fixes all the random decisions"
-         <*> configOption              "verbosity" "INTEGER"      "0 for quiet, ..., 4 to trace each communication attempt"
+         <$> (seconds <$> configOption "send-for"          "SECONDS"      "duration of the message-sending period")
+         <*> (seconds <$> configOption "wait-for"          "SECONDS"      "duration of the grace period")
+         <*> configOption              "with-seed"         "INTEGER"      "fixes all the random decisions"
+         <*> configOption              "verbosity"         "INTEGER"      "0 for quiet, ..., 4 to trace each communication attempt"
+         <*> configFlag                "omit-message-list"                "only display the score at the end, not the super long message list"
 
 fileParser :: Parser FileProvidedConfig
 fileParser = FileProvidedConfig
-         <$> parsableOption            "address"   "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
+         <$> parsableOption            "address"           "ADDRESS"      "the node's intended network-transport-tcp address, e.g. \"localhost:8080:0\""
 
 commandParser :: Parser Command
 commandParser = subparser
