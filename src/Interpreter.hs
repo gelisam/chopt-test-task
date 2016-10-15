@@ -87,22 +87,22 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
     go1 (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> liftIO $ mapM_ (sendOne (ProcessContribution c)) connections
         False -> return ()
-    go1 ReceiveContribution       = receiveContribution
+    go1 ReceiveContribution       = waitForContribution
     go1 (Commit m)                = do
         committedMessages %= (|> m)
         i <- length <$> use committedMessages
         committedScore += (fromIntegral i * m)
     
-    receiveContribution :: MaybeT M (Maybe Contribution)
-    receiveContribution = use pendingActions >>= \case
+    waitForContribution :: MaybeT M (Maybe Contribution)
+    waitForContribution = use pendingActions >>= \case
         Nothing -> do
           -- we have not called 'receiveMany' yet, do it now
           r <- liftIO $ receiveMany endpoint
           case r of
             Right cs -> do
               pendingActions .= Just cs
-              receiveContribution
-            Left lostAddress ->
+              waitForContribution
+            Left _ ->
               -- we don't support broken connections yet, so let's assume the connection broke
               -- because that other node has terminated, and let's terminate too.
               terminate
@@ -112,7 +112,7 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
         Just (StopSendingNow:cs) -> do
           pendingActions .= Just cs
           canSendContributions .= False
-          receiveContribution
+          waitForContribution
         Just (PrintResultNow:_) -> terminate
         Just [] -> do
           -- reset to 'Nothing' so the next call blocks with 'receiveMany' again, and
