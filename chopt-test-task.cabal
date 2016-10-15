@@ -31,6 +31,7 @@ executable chopt-test-task
                      , distributed-process-extras
                      , network-transport
                      , network-transport-tcp
+                     , lens
                      , optparse-applicative
                      , random
                      , split

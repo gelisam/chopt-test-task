@@ -1,8 +1,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Interpreter (interpret) where
 
+import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Strict
@@ -17,18 +19,20 @@ import Program
 
 
 data InterpreterState = InterpreterState
-  { pendingContributions :: Maybe [Contribution]  -- received but not yet passed on to the Program.
-                                                  -- @Nothing@ means we should call 'receiveMany',
-                                                  -- @Just []@ means we should tell the Program it's the end of the list
-  , canSendContributions :: Bool
+  { _pendingContributions :: Maybe [Contribution]  -- received but not yet passed on to the Program.
+                                                   -- @Nothing@ means we should call 'receiveMany',
+                                                   -- @Just []@ means we should tell the Program it's the end of the list
+  , _canSendContributions :: Bool
   }
   deriving (Eq, Show)
 
 initialInterpreterState :: InterpreterState
 initialInterpreterState = InterpreterState
-                        { pendingContributions = Nothing
-                        , canSendContributions = True
+                        { _pendingContributions = Nothing
+                        , _canSendContributions = True
                         }
+
+makeLenses ''InterpreterState
 
 
 interpret :: UserProvidedConfig -> Int -> NodeIndex -> EndPoint -> [Connection] -> Program a -> IO a
@@ -47,23 +51,23 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex endpoint connections
     go1 GetNbNodes                = return nbNodes
     go1 GetMyNodeIndex            = return myIndex
     go1 GenerateRandomMessage     = lift randomMessage
-    go1 (BroadcastContribution c) = (canSendContributions <$> get) >>= \case
+    go1 (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> liftIO $ mapM_ (sendOne c) connections
         False -> return ()
-    go1 ReceiveContribution       = (pendingContributions <$> get) >>= \case
+    go1 ReceiveContribution       = use pendingContributions >>= \case
         Nothing -> do
           -- we have not called 'receiveMany' yet, do it now
           cs <- liftIO $ receiveMany endpoint
-          modify $ \s -> s { pendingContributions = Just cs }
+          pendingContributions .= Just cs
           go1 ReceiveContribution
           -- cs is non-empty, "fall through" to the next line
         Just (c:cs) -> do
-          modify $ \s -> s { pendingContributions = Just cs }
+          pendingContributions .= Just cs
           return (Just c)
         Just [] -> do
           -- reset to 'Nothing' so the next call blocks with 'receiveMany' again, and
           -- tell 'receiveContributions' that the list is over
-          modify $ \s -> s { pendingContributions = Nothing }
+          pendingContributions .= Nothing
           return Nothing
     go1 (Commit _)                = return ()
     
