@@ -14,12 +14,14 @@ import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Strict
 import Data.Foldable
 import Data.Sequence (Seq, (|>))
+import Data.Time
 import Data.Void
 import GHC.Generics
 import Network.Transport
 import System.Random
 
 import Config hiding (Command)
+import Control.Concurrent.MyExtra
 import Control.Monad.MyExtra
 import Data.Binary.Strict
 import Log
@@ -69,8 +71,8 @@ runM seed = flip evalStateT (mkStdGen seed)
           . flip evalStateT initialInterpreterState
 
 
-interpret :: UserProvidedConfig -> Int -> NodeIndex -> Address -> EndPoint -> [Connection] -> Program Void -> IO ()
-interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connections program = do
+interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> EndPoint -> [Connection] -> Program Void -> IO ()
+interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint connections program = do
     _ <- forkIO timeKeeper
     runM mySeed (go program)
   where
@@ -143,11 +145,22 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
     
     timeKeeper :: IO ()
     timeKeeper = do
+        let sendingDuration = timeIntervalToDiffTime configMessageSendingDuration
+        let totalDuration   = timeIntervalToDiffTime (configMessageSendingDuration + configGracePeriodDuration)
+        let terminationTime = totalDuration `addUTCTime` startTime
+        
+        -- if we wait until the end of the grace period we'll be killed before printing anything
+        let printResultTime = timeIntervalToDiffTime (seconds (-1)) `addUTCTime` terminationTime
+        
+        -- if the grace period is really short, we might want to shorten the sending period as well
+        let stopSendingTime = printResultTime `min` (sendingDuration `addUTCTime` startTime)
+        
         selfConnection <- connectStubbornly endpoint myAddress
-        threadDelay $ asTimeout configMessageSendingDuration
+        
+        sleepUntil stopSendingTime
         sendOne StopSendingNow selfConnection
         putLogLn configVerbosity 1 $ "no messages can be sent anymore."
         
-        threadDelay $ asTimeout (configGracePeriodDuration - seconds 1)
+        sleepUntil printResultTime
         putLogLn configVerbosity 1 $ "better print the output before it's too late."
         sendOne PrintResultNow selfConnection

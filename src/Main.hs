@@ -2,6 +2,7 @@ module Main where
 
 import           Control.Monad
 import           Data.List
+import           Data.Time
 import           Options.Applicative (execParser)
 import           Text.Printf
 
@@ -14,6 +15,7 @@ import           Text.Parsable
 
 main :: IO ()
 main = do
+    startTime <- getCurrentTime
     command <- execParser commandInfo
     case command of
       CheckArgs _ ->
@@ -31,4 +33,4 @@ main = do
         endpoint <- createEndpointStubbornly myAddress
         connections <- mapM (connectStubbornly endpoint) peerAddresses
         
-        interpret userConfig nbNodes myIndex myAddress endpoint connections algorithm
+        interpret userConfig startTime nbNodes myIndex myAddress endpoint connections algorithm

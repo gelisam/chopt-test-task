@@ -13,6 +13,7 @@ executable chopt-test-task
   main-is:             Main.hs
   other-modules:       Algorithm
                      , Config
+                     , Control.Concurrent.MyExtra
                      , Control.Monad.MyExtra
                      , Data.Binary.Strict
                      , Interpreter
@@ -35,6 +36,7 @@ executable chopt-test-task
                      , optparse-applicative
                      , random
                      , split
+                     , time
                      , transformers
                      , void
   hs-source-dirs:      src
