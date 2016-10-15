@@ -10,7 +10,7 @@ for SEMI_ADDRESS in $(cat nodelist.txt | tr ' ' ';'); do
 done
 
 
-# wait for CTRL-C
-while true; do
-  sleep 100
+# wait for all the child processes to terminate
+for SEMI_ADDRESS in $(cat nodelist.txt | tr ' ' ';'); do
+  wait
 done

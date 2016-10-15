@@ -13,7 +13,5 @@ PID="$!"
 trap "./scripts/kill_recursively.sh $PID" EXIT
 
 
-# wait for CTRL-C
-while true; do
-  sleep 100
-done
+# wait for the child process to terminate
+wait
