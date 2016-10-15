@@ -2,6 +2,7 @@ module Config where
 
 import Options.Applicative
 
+import Log
 import Network.Transport.TCP.Address
 import Text.Parsable
 
@@ -10,7 +11,7 @@ data UserProvidedConfig = UserProvidedConfig
   { configMessageSendingDuration :: !Int
   , configGracePeriodDuration    :: !Int
   , configRandomSeed             :: !Int
-  , configVerbosity              :: !Int
+  , configVerbosity              :: !Verbosity
   }
   deriving (Eq, Show)
 

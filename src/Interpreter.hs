@@ -14,7 +14,7 @@ import Network.Transport.MyExtra
 import Program
 
 
-interpret :: UserProvidedConfig -> Int -> Int -> EndPoint -> [Connection] -> Program a -> IO a
+interpret :: UserProvidedConfig -> Int -> NodeIndex -> EndPoint -> [Connection] -> Program a -> IO a
 interpret (UserProvidedConfig {..}) nbNodes myIndex endpoint connections
   = flip evalStateT (mkStdGen configRandomSeed) . go
   where

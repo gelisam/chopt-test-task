@@ -6,7 +6,7 @@ import           Options.Applicative (execParser)
 import           Text.Printf
 
 import           Algorithm
-import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
+import           Config (Command(..), commandInfo, FileProvidedConfig(..))
 import           Interpreter
 import           Network.Transport.MyExtra
 import           Text.Parsable

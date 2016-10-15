@@ -22,6 +22,7 @@ randomMessage :: Monad m => StateT StdGen m Message
 randomMessage = state $ randomR (0, 1)
 
 
+type NodeIndex = Int
 type BitSet = Integer 
 
 
@@ -51,7 +52,7 @@ instance Monoid RoundStatus where
         
         allContributors = c1 .|. c2
 
-initialRoundStatus :: Int -> Message -> RoundStatus
+initialRoundStatus :: NodeIndex -> Message -> RoundStatus
 initialRoundStatus myIndex message
   = RoundStatus { roundMessage      = message
                 , roundContributors = bit myIndex  -- we only know about our own contribution
@@ -65,7 +66,7 @@ type RoundNumber = Int
 
 data OverallStatus = OverallStatus
   { numberOfNodes      :: !Int
-  , indexOfCurrentNode :: !Int  -- between 0 and numberOfNodes-1
+  , indexOfCurrentNode :: !NodeIndex  -- between 0 and numberOfNodes-1
   , previousRounds     :: !(Seq Message)
   , currentRoundNumber :: !RoundNumber
   , currentRoundStatus :: !RoundStatus
@@ -73,7 +74,7 @@ data OverallStatus = OverallStatus
   }
   deriving (Eq, Show)
 
-initialOverallStatus :: Int -> Int -> Message -> Message -> OverallStatus
+initialOverallStatus :: Int -> NodeIndex -> Message -> Message -> OverallStatus
 initialOverallStatus nbNodes myIndex message1 message2
   = OverallStatus { numberOfNodes      = nbNodes
                   , indexOfCurrentNode = myIndex

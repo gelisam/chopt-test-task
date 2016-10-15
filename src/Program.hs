@@ -17,7 +17,7 @@ import Message
 data Command a where
     Log :: Verbosity -> String -> Command ()
     GetNbNodes :: Command Int
-    GetMyNodeIndex :: Command Int  -- between 0 and NbNodes-1
+    GetMyNodeIndex :: Command NodeIndex  -- between 0 and NbNodes-1
     GenerateRandomMessage :: Command Message
     BroadcastContribution :: Contribution -> Command ()
     ReceiveContributions :: Command [Contribution]
@@ -50,7 +50,7 @@ log v s = liftCommand $ Log v s
 getNbNodes :: Program Int
 getNbNodes = liftCommand GetNbNodes
 
-getMyNodeIndex :: Program Int
+getMyNodeIndex :: Program NodeIndex
 getMyNodeIndex = liftCommand GetMyNodeIndex
 
 generateRandomMessage :: Program Message
