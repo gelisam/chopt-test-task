@@ -1,4 +1,6 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- I'd like to simulate my algorithm in a pure interpreter who can simulate dropped
 -- messages easily, and I also need to run the same algorithm in distributed-process.
@@ -6,6 +8,8 @@
 module Program where
 
 import Control.Monad (ap)
+import Data.Foldable
+import Data.Sequence
 
 import Log
 import Message
@@ -20,7 +24,7 @@ data Command a where
     GetMyNodeIndex :: Command NodeIndex  -- between 0 and NbNodes-1
     GenerateRandomMessage :: Command Message
     BroadcastContribution :: Contribution -> Command ()
-    ReceiveContributions :: Command [Contribution]
+    ReceiveContribution :: Command (Maybe Contribution)  -- see 'receiveContributions'
     Commit :: Message -> Command ()
 
 
@@ -59,8 +63,21 @@ generateRandomMessage = liftCommand GenerateRandomMessage
 broadcastContribution :: Contribution -> Program ()
 broadcastContribution contributions = liftCommand $ BroadcastContribution contributions
 
-receiveContributions :: Program [Contribution]
-receiveContributions = liftCommand ReceiveContributions
+receiveContribution :: Program (Maybe Contribution)
+receiveContribution = liftCommand ReceiveContribution
 
 commit :: Message -> Program ()
 commit message = liftCommand $ Commit message
+
+
+-- The Network.Transport.TCP API can return more than one message at a time, I want Program's API
+-- to do that too, but for technical reasons 'receiveContribution' above returns a single message
+-- at a time instead, followed by returning a 'Nothing' to indicate the end of the list. Here we
+-- reconstruct the list in order to have a more sane API.
+receiveContributions :: Program [Contribution]
+receiveContributions = go mempty
+  where
+    go :: Seq Contribution -> Program [Contribution]
+    go !cs = receiveContribution >>= \case
+        Just c  -> go (cs |> c)
+        Nothing -> return $ toList cs
