@@ -7,10 +7,13 @@ module Interpreter (interpret) where
 
 import Control.Concurrent
 import Control.Distributed.Process.Extras.Time
-import Control.Lens
+import Control.Lens (makeLenses, use, (.=), (%=), (+=))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.State.Strict
+import Data.Foldable
+import Data.Sequence (Seq, (|>))
 import Data.Void
 import GHC.Generics
 import Network.Transport
@@ -31,16 +34,19 @@ import Program
 data Action
   = ProcessContribution Contribution
   | StopSendingNow
+  | PrintResultNow
   deriving (Generic, Eq, Show)
 
 instance Binary Action
 
 
 data InterpreterState = InterpreterState
-  { _pendingActions :: Maybe [Action]  -- received but not yet passed on to the Program.
-                                       -- @Nothing@ means we should call 'receiveMany',
-                                       -- @Just []@ means we should tell the Program it's the end of the list
-  , _canSendContributions :: Bool
+  { _pendingActions       :: Maybe [Action]  -- received but not yet passed on to the Program.
+                                             -- @Nothing@ means we should call 'receiveMany',
+                                             -- @Just []@ means we should tell the Program it's the end of the list
+  , _canSendContributions :: !Bool
+  , _committedMessages    :: !(Seq Message)
+  , _committedScore       :: !Double
   }
   deriving (Eq, Show)
 
@@ -48,13 +54,15 @@ initialInterpreterState :: InterpreterState
 initialInterpreterState = InterpreterState
                         { _pendingActions       = Nothing
                         , _canSendContributions = True
+                        , _committedMessages    = mempty
+                        , _committedScore       = 0
                         }
 
 makeLenses ''InterpreterState
 
 
 -- the interpreter's monad transformer stack: its state, the random number's state, and IO
-type M a = StateT InterpreterState (StateT StdGen IO) a
+type M = StateT InterpreterState (StateT StdGen IO)
 
 runM :: Int -> M a -> IO a
 runM seed = flip evalStateT (mkStdGen seed)
@@ -71,11 +79,11 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
     mySeed :: Int
     mySeed = configRandomSeed + myIndex
     
-    go1 :: Command a -> M a
+    go1 :: Command a -> MaybeT M a
     go1 (Log v s)                 = liftIO $ putLogLn configVerbosity v s
     go1 GetNbNodes                = return nbNodes
     go1 GetMyNodeIndex            = return myIndex
-    go1 GenerateRandomMessage     = lift randomMessage
+    go1 GenerateRandomMessage     = (lift . lift) randomMessage
     go1 (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> liftIO $ mapM_ (sendOne (ProcessContribution c)) connections
         False -> return ()
@@ -92,19 +100,29 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
           pendingActions .= Just cs
           canSendContributions .= False
           go1 ReceiveContribution
+        Just (PrintResultNow:cs) -> do
+          pendingActions .= Just cs
+          
+          ms <- toList <$> use committedMessages
+          s <- use committedScore
+          liftIO $ print (ms, s)
+          
+          -- abort the @MaybeT M a@ computation
+          fail "the program has terminated"
         Just [] -> do
           -- reset to 'Nothing' so the next call blocks with 'receiveMany' again, and
           -- tell 'receiveContributions' that the list is over
           pendingActions .= Nothing
           return Nothing
-    go1 (Commit _)                = return ()
+    go1 (Commit m)                = do
+        committedMessages %= (|> m)
+        i <- length <$> use committedMessages
+        committedScore += (fromIntegral i * m)
     
     go :: Program Void -> M ()
     go = untilNothingM $ \case
         Return void -> absurd void
-        Bind cr cc -> do
-          r <- go1 cr
-          return $ Just (cc r)
+        Bind cr cc -> runMaybeT (cc <$> go1 cr)
     
     timeKeeper :: IO ()
     timeKeeper = do
@@ -112,3 +130,7 @@ interpret (UserProvidedConfig {..}) nbNodes myIndex myAddress endpoint connectio
         threadDelay $ asTimeout configMessageSendingDuration
         sendOne StopSendingNow selfConnection
         putLogLn configVerbosity 1 $ "no messages can be sent anymore."
+        
+        threadDelay $ asTimeout (configGracePeriodDuration - seconds 1)
+        putLogLn configVerbosity 1 $ "better print the output before it's too late."
+        sendOne PrintResultNow selfConnection
