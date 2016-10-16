@@ -1,3 +1,25 @@
+-- Without fault-tolerance nor a fixed time period of exexution, the interpreter is easy: acquire a
+-- connection to each of the other nodes, use them to send and receive messages when the Program says
+-- to, and continue doing so forever. What enables this simplicity is that we have a single input
+-- source, the messages we receive, and a single output sink, the messages we send. This allows us to
+-- block on the single input source without worrying about any other sources of interference.
+-- 
+-- With a fixed period of execution, things become a bit more complicated because the input messages
+-- and the time-triggered events are both input sources. To reorganize the system so that every piece
+-- has a single source again, I run two threads upstream of the interpreter's thread, one which
+-- counts the elapsed time and one which waits for events from the endpoint. Both send 'Action's to
+-- the interpreter's thread, who now has a single input source of events. Of course, those are now
+-- Action events, not messages, so the interpreter's logic has to be extended accordingly.
+-- 
+-- With fault-tolerance, things become even more complicated. The Program should continue to execute,
+-- sending and receiving contributions, with the only difference being that we no longer exchange
+-- messages with the nodes which are no longer reachable. At the same time, we should also repeatedly
+-- attempt to reconnect to those unreachable nodes, in case the network connectivity is restored. I
+-- do this by spawning a reconnection thread each time we're diconnected from one of the other nodes.
+-- This reconnection thread repeatedly attempts to reconnect, and doesn't need to inform anyone when
+-- it succeeds, because 'receiveMany' already receives a notification when a new connection is
+-- established.
+
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -32,9 +54,9 @@ import Program
 import Text.Parsable
 
 
--- While the main interpreter will spend most of its time waiting for messages, a few helper threads
--- will take care of auxiliary tasks such as making sure we stop after the allocated time expires.
--- Here are the actions which the helper can ask the interpreter to perform.
+-- While the main interpreter will spend most of its time waiting for messages, the helper threads
+-- described above will take care of auxiliary tasks such as making sure we stop after the allocated
+-- time expires. Here are the actions which the helpers can ask the interpreter to perform.
 data Action
   = ProcessContributions [Contribution]
   | StopSendingNow
