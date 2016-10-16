@@ -1,6 +1,8 @@
 module Main where
 
 import           Control.Monad
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Resource
 import           Data.List
 import           Data.Time
 import           Options.Applicative (execParser)
@@ -30,7 +32,9 @@ main = do
         let nbNodes       = length allAddresses
         let peerAddresses = filter (/= myAddress) allAddresses
         
-        endpoint <- createEndpointStubbornly myAddress
-        connections <- mapM (connectStubbornly endpoint) peerAddresses
-        
-        interpret userConfig startTime nbNodes myIndex myAddress endpoint connections algorithm
+        runResourceT $ do
+          transport   <- snd <$> createTransportStubbornly myAddress
+          endpoint    <- snd <$> createEndpointStubbornly transport myAddress
+          connections <- mapM (fmap snd . createConnectionStubbornly endpoint) peerAddresses
+          
+          lift $ interpret userConfig startTime nbNodes myIndex myAddress endpoint connections algorithm

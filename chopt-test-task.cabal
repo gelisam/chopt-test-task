@@ -35,6 +35,7 @@ executable chopt-test-task
                      , lens
                      , optparse-applicative
                      , random
+                     , resourcet
                      , split
                      , time
                      , transformers

@@ -11,6 +11,7 @@ import Control.Lens (makeLenses, use, (.=), (%=), (+=))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State.Strict
 import Data.Foldable
 import Data.Sequence (Seq, (|>))
@@ -143,7 +144,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
         Bind cr cc -> runMaybeT (cc <$> go1 cr)
     
     timeKeeper :: IO ()
-    timeKeeper = do
+    timeKeeper = runResourceT $ do
         let sendingDuration = timeIntervalToDiffTime configMessageSendingDuration
         let totalDuration   = timeIntervalToDiffTime (configMessageSendingDuration + configGracePeriodDuration)
         let terminationTime = totalDuration `addUTCTime` startTime
@@ -154,12 +155,13 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
         -- if the grace period is really short, we might want to shorten the sending period as well
         let stopSendingTime = printResultTime `min` (sendingDuration `addUTCTime` startTime)
         
-        selfConnection <- connectStubbornly endpoint myAddress
+        selfConnection <- snd <$> createConnectionStubbornly endpoint myAddress
         
-        sleepUntil stopSendingTime
-        sendOne StopSendingNow selfConnection
-        putLogLn configVerbosity 1 $ "no messages can be sent anymore."
-        
-        sleepUntil printResultTime
-        putLogLn configVerbosity 1 $ "better print the output before it's too late."
-        sendOne PrintResultNow selfConnection
+        liftIO $ do
+          sleepUntil stopSendingTime
+          sendOne StopSendingNow selfConnection
+          putLogLn configVerbosity 1 $ "no messages can be sent anymore."
+          
+          sleepUntil printResultTime
+          putLogLn configVerbosity 1 $ "better print the output before it's too late."
+          sendOne PrintResultNow selfConnection
