@@ -19,6 +19,7 @@ import Data.Time
 import Data.Void
 import GHC.Generics
 import System.Random
+import Text.Printf
 
 import Config hiding (Command)
 import Control.Concurrent.MyExtra
@@ -29,6 +30,7 @@ import Message
 import Network.Transport.MyExtra
 import Network.Transport.TCP.Address
 import Program
+import Text.Parsable
 
 
 -- From the Program's point of view, only Contributions are being transmitted, but in order to stop
@@ -64,10 +66,11 @@ makeLenses ''InterpreterState
 
 
 -- the interpreter's monad transformer stack: its state, the random number's state, and IO
-type M = StateT InterpreterState (StateT StdGen IO)
+type M = StateT InterpreterState (StateT StdGen (TransportT IO))
 
 runM :: Int -> M a -> IO a
-runM seed = flip evalStateT (mkStdGen seed)
+runM seed = runTransportT
+          . flip evalStateT (mkStdGen seed)
           . flip evalStateT initialInterpreterState
 
 
@@ -85,7 +88,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
     go1 (Log v s)                 = liftIO $ putLogLn configVerbosity v s
     go1 GetNbNodes                = return nbNodes
     go1 GetMyNodeIndex            = return myIndex
-    go1 GenerateRandomMessage     = (lift . lift) randomMessage
+    go1 GenerateRandomMessage     = lift . lift $ randomMessage
     go1 (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> liftIO $ mapM_ (sendOne (ProcessContribution c)) connections
         False -> return ()
@@ -99,15 +102,20 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
     waitForContribution = use pendingActions >>= \case
         Nothing -> do
           -- we have not called 'receiveMany' yet, do it now
-          r <- liftIO $ receiveMany endpoint
+          r <- lift . lift . lift $ receiveMany endpoint
           case r of
             Received cs -> do
               pendingActions .= Just cs
               waitForContribution
-            BrokenConnection _ ->
-              -- we don't support broken connections yet, so let's assume the connection broke
-              -- because that other node has terminated, and let's terminate too.
+            ClosedConnection _ ->
+              -- another node has terminated, terminate too.
+              -- TODO: wait for messages from other nodes in an attempt to get a better score
               terminate
+            BrokenConnection remoteAddress ->
+              -- we don't support broken connections yet
+              fail $ printf "node %s lost connection with %s"
+                            (unparse myAddress)
+                            (unparse remoteAddress)
         Just (ProcessContribution c:cs) -> do
           pendingActions .= Just cs
           return (Just c)
