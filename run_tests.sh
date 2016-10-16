@@ -8,7 +8,7 @@ stack install
 # argument-parsing logic here, we use a special role which tests the arguments.
 chopt-test-task check-args "$@"
 
-./scripts/run_tests_and_hang.sh "$@" &
+time ./scripts/run_tests_and_hang.sh "$@" &
 PID="$!"
 trap "./scripts/kill_recursively.sh $PID" EXIT
 
