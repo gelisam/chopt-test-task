@@ -172,3 +172,6 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
           -- another node has terminated, stop listening for more contributions.
           -- TODO: wait for messages from other nodes in an attempt to get a better score
           return ()
+        ClosedEndpoint ->
+          -- the main thread has terminated, better stop too.
+          return ()

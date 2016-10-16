@@ -92,6 +92,7 @@ data Event a
   = Received [a]
   | BrokenConnection Address
   | ClosedConnection Address
+  | ClosedEndpoint
 
 
 -- 'ConnectionOpened' and 'ConnectionClosed' require us to keep track of ConnectionIds
@@ -120,6 +121,8 @@ receiveMany localEndpoint = (liftIO $ Transport.receive localEndpoint) >>= \case
       return $ ClosedConnection address
     Transport.ErrorEvent (Transport.TransportError (Transport.EventConnectionLost lostEndpointAddress) _) ->
       BrokenConnection <$> parseEndpointAddress lostEndpointAddress
+    Transport.EndPointClosed -> do
+      return ClosedEndpoint
     err -> do
       -- some unexpected event we're not prepared to handle
       fail (show err)
