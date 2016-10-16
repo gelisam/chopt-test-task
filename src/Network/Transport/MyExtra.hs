@@ -49,7 +49,7 @@ createEndpoint transport expectedAddress = allocate go Transport.closeEndPoint
     go :: IO EndPoint
     go = do
         endpoint <- join $ fromRightM <$> Transport.newEndPoint transport
-        if Transport.address endpoint == endpointAddress expectedAddress
+        if Transport.address endpoint == unparseEndpointAddress expectedAddress
         then
           return endpoint
         else
@@ -63,7 +63,7 @@ createConnection localEndpoint remoteAddress = allocate go Transport.close
     go :: IO Connection
     go = untilJustM $ do
         r <- Transport.connect localEndpoint
-                               (endpointAddress remoteAddress)
+                               (unparseEndpointAddress remoteAddress)
                                Transport.ReliableOrdered
                                Transport.defaultConnectHints
         case r of

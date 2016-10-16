@@ -32,10 +32,10 @@ instance Parsable Address where
     unparse (Address {..}) = printf "%s:%d:%d" addressHost addressPort addressChannel
 
 
-endpointAddress :: Address -> EndPointAddress
-endpointAddress = EndPointAddress
-                . ByteString.pack
-                . unparse
+unparseEndpointAddress :: Address -> EndPointAddress
+unparseEndpointAddress = EndPointAddress
+                       . ByteString.pack
+                       . unparse
 
 parseEndpointAddress :: Monad m => EndPointAddress -> m Address
 parseEndpointAddress = parse
