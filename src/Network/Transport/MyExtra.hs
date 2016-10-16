@@ -9,7 +9,6 @@ module Network.Transport.MyExtra
   ) where
 
 import           Control.Monad (join)
-import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
 import           Control.Concurrent (threadDelay)
 import qualified Network.Transport as Transport
@@ -26,7 +25,7 @@ import           Text.Parsable
 
 
 createTransport :: Address -> ResIO (ReleaseKey, Transport)
-createTransport expectedAddress@(Address {..}) = allocate go Transport.closeTransport
+createTransport (Address {..}) = allocate go Transport.closeTransport
   where
     go :: IO Transport
     go = untilJustM $ do
@@ -45,7 +44,7 @@ createTransport expectedAddress@(Address {..}) = allocate go Transport.closeTran
             return $ Just transport
 
 createEndpoint :: Transport -> Address -> ResIO (ReleaseKey, EndPoint)
-createEndpoint transport expectedAddress@(Address {..}) = allocate go Transport.closeEndPoint
+createEndpoint transport expectedAddress = allocate go Transport.closeEndPoint
   where
     go :: IO EndPoint
     go = do
