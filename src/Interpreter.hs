@@ -17,7 +17,6 @@ import Data.Sequence (Seq, (|>))
 import Data.Time
 import Data.Void
 import GHC.Generics
-import Network.Transport
 import System.Random
 
 import Config hiding (Command)

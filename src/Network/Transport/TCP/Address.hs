@@ -5,7 +5,7 @@ module Network.Transport.TCP.Address where
 import qualified Data.ByteString.Char8 as ByteString
 import           Data.Function
 import           Data.List.Split
-import           Network.Transport
+import           Network.Transport (EndPointAddress(..))
 import           Text.Printf
 
 import           Control.Monad.MyExtra

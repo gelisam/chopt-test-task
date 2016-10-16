@@ -1,6 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
-module Network.Transport.MyExtra where
+module Network.Transport.MyExtra
+  -- export everything from this module
+  ( module Network.Transport.MyExtra
+  
+  -- re-export important types from "Network.Transport" so users don't have to also import it
+  , Connection, EndPoint, EndPointAddress
+  ) where
 
 import           Control.Monad (join)
 import           Control.Concurrent (threadDelay)
