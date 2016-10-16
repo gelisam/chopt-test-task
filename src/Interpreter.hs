@@ -71,7 +71,7 @@ runM seed = flip evalStateT (mkStdGen seed)
           . flip evalStateT initialInterpreterState
 
 
-interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> EndPoint -> [Connection] -> Program Void -> IO ()
+interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> Endpoint -> [Connection] -> Program Void -> IO ()
 interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint connections program = do
     mvar <- newEmptyMVar
     _ <- forkIO $ timeKeeper mvar

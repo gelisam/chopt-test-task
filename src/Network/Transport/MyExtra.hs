@@ -5,7 +5,7 @@ module Network.Transport.MyExtra
   ( module Network.Transport.MyExtra
   
   -- re-export important types from "Network.Transport" so users don't have to also import it
-  , Connection, EndPoint, EndPointAddress, Transport
+  , Connection, Transport  -- plus Endpoint and EndpointAddress, exported above
   ) where
 
 import           Control.Monad (join)
@@ -28,6 +28,11 @@ import           Network.Transport.TCP.Address
 import           Text.Parsable
 
 
+-- Since I'm going to re-export this type anyway, I might as well use my preferred spelling
+type Endpoint = EndPoint
+type EndpointAddress = EndPointAddress
+
+
 createTransport :: Address -> ResIO (ReleaseKey, Transport)
 createTransport (Address {..}) = allocate go Transport.closeTransport
   where
@@ -47,10 +52,10 @@ createTransport (Address {..}) = allocate go Transport.closeTransport
           Right transport ->
             return $ Just transport
 
-createEndpoint :: Transport -> Address -> ResIO (ReleaseKey, EndPoint)
+createEndpoint :: Transport -> Address -> ResIO (ReleaseKey, Endpoint)
 createEndpoint transport expectedAddress = allocate go Transport.closeEndPoint
   where
-    go :: IO EndPoint
+    go :: IO Endpoint
     go = do
         endpoint <- join $ fromRightM <$> Transport.newEndPoint transport
         if Transport.address endpoint == unparseEndpointAddress expectedAddress
@@ -61,7 +66,7 @@ createEndpoint transport expectedAddress = allocate go Transport.closeEndPoint
                         (show $ Transport.address endpoint)
                         (show $ unparse expectedAddress)
 
-createConnection :: EndPoint -> Address -> ResIO (ReleaseKey, Connection)
+createConnection :: Endpoint -> Address -> ResIO (ReleaseKey, Connection)
 createConnection localEndpoint remoteAddress = allocate go Transport.close
   where
     go :: IO Connection
@@ -99,7 +104,7 @@ runTransportT = flip evalStateT mempty
 sendOne :: Binary a => a -> Connection -> IO ()
 sendOne x connection = join $ fromRightM <$> Transport.send connection [Binary.encode x]
 
-receiveMany :: Binary a => EndPoint -> TransportT IO (Event a)
+receiveMany :: Binary a => Endpoint -> TransportT IO (Event a)
 receiveMany localEndpoint = (liftIO $ Transport.receive localEndpoint) >>= \case
     Transport.Received _ messages ->
       return $ Received $ map Binary.decode messages
