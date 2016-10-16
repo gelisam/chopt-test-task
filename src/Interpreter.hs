@@ -163,12 +163,12 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
         Received cs -> do
           liftIO $ putMVar mvar (ProcessContributions cs)
           contributionReceiver mvar
-        ClosedConnection _ ->
-          -- another node has terminated, stop listening for more contributions.
-          -- TODO: wait for messages from other nodes in an attempt to get a better score
-          return ()
         BrokenConnection remoteAddress ->
           -- we don't support broken connections yet
           fail $ printf "node %s lost connection with %s"
                         (unparse myAddress)
                         (unparse remoteAddress)
+        ClosedConnection _ ->
+          -- another node has terminated, stop listening for more contributions.
+          -- TODO: wait for messages from other nodes in an attempt to get a better score
+          return ()

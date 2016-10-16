@@ -85,8 +85,8 @@ createConnection localEndpoint remoteAddress = allocate go Transport.close
 -- a slightly simpler version of 'Network.Transport.Event'
 data Event a
   = Received [a]
-  | ClosedConnection Address
   | BrokenConnection Address
+  | ClosedConnection Address
 
 
 -- 'ConnectionOpened' and 'ConnectionClosed' require us to keep track of ConnectionIds
