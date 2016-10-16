@@ -103,7 +103,17 @@ runTransportT = flip evalStateT mempty
 
 
 sendOne :: Binary a => a -> Connection -> IO ()
-sendOne x connection = join $ fromRightM <$> Transport.send connection [Binary.encode x]
+sendOne x connection = do
+    r <- Transport.send connection [Binary.encode x]
+    case r of
+      Right () ->
+        return ()
+      Left (Transport.TransportError Transport.SendClosed _) ->
+        -- ignore, 'receiveMany' will get also get a 'ConnectionClosed' and will deal with it
+        return ()
+      Left (Transport.TransportError Transport.SendFailed _) ->
+        -- ignore, 'receiveMany' will get also get a 'EventConnectionLost' and will deal with it
+        return ()
 
 receiveMany :: Binary a => Endpoint -> TransportT IO (Event a)
 receiveMany localEndpoint = (liftIO $ Transport.receive localEndpoint) >>= \case
