@@ -50,6 +50,7 @@ data InterpreterState = InterpreterState
                                              -- @Just []@ means we should tell the Program it's the end of the list
   , _canSendContributions :: !Bool
   , _committedMessages    :: !(Seq Message)
+  , _previousScore        :: !Double
   , _committedScore       :: !Double
   }
   deriving (Eq, Show)
@@ -59,6 +60,7 @@ initialInterpreterState = InterpreterState
                         { _pendingActions       = Nothing
                         , _canSendContributions = True
                         , _committedMessages    = mempty
+                        , _previousScore        = 0
                         , _committedScore       = 0
                         }
 
@@ -94,6 +96,9 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
         False -> return ()
     go1 ReceiveContribution       = waitForContribution
     go1 (Commit m)                = do
+        s <- use committedScore
+        previousScore .= s
+        
         committedMessages %= (|> m)
         i <- length <$> use committedMessages
         committedScore += (fromIntegral i * m)
@@ -142,6 +147,10 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
           ms <- toList <$> use committedMessages
           s <- use committedScore
           liftIO $ print (ms, s)
+        
+        s <- use previousScore
+        liftIO $ putLogLn configVerbosity 1
+               $ printf "we don't guarantee that every node receives the last message,\nso other nodes might say %g" s
         
         -- abort the @MaybeT M a@ computation
         fail "the program has terminated"
