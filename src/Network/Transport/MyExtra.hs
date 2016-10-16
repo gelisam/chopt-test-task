@@ -12,8 +12,9 @@ import           Control.Monad (join)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
 import           Control.Concurrent (threadDelay)
-import           Network.Transport
-import           Network.Transport.TCP (createTransport, defaultTCPParameters)
+import qualified Network.Transport as Transport
+import           Network.Transport (Connection, EndPoint, EndPointAddress, Transport)
+import qualified Network.Transport.TCP as TCP
 import           System.IO.Error (isAlreadyInUseError)
 import           Text.Printf
 
@@ -24,12 +25,14 @@ import           Network.Transport.TCP.Address
 import           Text.Parsable
 
 
-createTransportStubbornly :: Address -> ResIO (ReleaseKey, Transport)
-createTransportStubbornly expectedAddress@(Address {..}) = allocate go closeTransport
+createTransport :: Address -> ResIO (ReleaseKey, Transport)
+createTransport expectedAddress@(Address {..}) = allocate go Transport.closeTransport
   where
     go :: IO Transport
     go = untilJustM $ do
-        r <- createTransport addressHost (show addressPort) defaultTCPParameters
+        r <- TCP.createTransport addressHost
+                                 (show addressPort)
+                                 TCP.defaultTCPParameters
         case r of
           Left err | isAlreadyInUseError err -> do
             -- sometimes the OS keeps sockets busy for a minute after a server stops, try again
@@ -41,49 +44,52 @@ createTransportStubbornly expectedAddress@(Address {..}) = allocate go closeTran
           Right transport ->
             return $ Just transport
 
-createEndpointStubbornly :: Transport -> Address -> ResIO (ReleaseKey, EndPoint)
-createEndpointStubbornly transport expectedAddress@(Address {..}) = allocate go closeEndPoint
+createEndpoint :: Transport -> Address -> ResIO (ReleaseKey, EndPoint)
+createEndpoint transport expectedAddress@(Address {..}) = allocate go Transport.closeEndPoint
   where
     go :: IO EndPoint
     go = do
-        endpoint <- join $ fromRightM <$> newEndPoint transport
-        if address endpoint == endpointAddress expectedAddress
+        endpoint <- join $ fromRightM <$> Transport.newEndPoint transport
+        if Transport.address endpoint == endpointAddress expectedAddress
         then
           return endpoint
         else
           fail $ printf "endpoint creation succeeded but the resulting address %s isn't the expected %s"
-                        (show $ address endpoint)
+                        (show $ Transport.address endpoint)
                         (show $ unparse expectedAddress)
 
-createConnectionStubbornly :: EndPoint -> Address -> ResIO (ReleaseKey, Connection)
-createConnectionStubbornly localEndpoint remoteAddress = allocate go close
+createConnection :: EndPoint -> Address -> ResIO (ReleaseKey, Connection)
+createConnection localEndpoint remoteAddress = allocate go Transport.close
   where
     go :: IO Connection
     go = untilJustM $ do
-        r <- connect localEndpoint (endpointAddress remoteAddress) ReliableOrdered defaultConnectHints
+        r <- Transport.connect localEndpoint
+                               (endpointAddress remoteAddress)
+                               Transport.ReliableOrdered
+                               Transport.defaultConnectHints
         case r of
-          Left (TransportError ConnectNotFound _) -> do
+          Left (Transport.TransportError Transport.ConnectNotFound _) -> do
             -- the remote program probably isn't fully-initialized yet, try again.
             printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
             threadDelay (1000 * 1000)  -- 1s
             return Nothing
-          Left (TransportError _ err) ->
+          Left (Transport.TransportError _ err) ->
             fail err
           Right connection ->
             return $ Just connection
 
 
 sendOne :: Binary a => a -> Connection -> IO ()
-sendOne x connection = join $ fromRightM <$> send connection [Binary.encode x]
+sendOne x connection = join $ fromRightM <$> Transport.send connection [Binary.encode x]
 
 receiveMany :: Binary a => EndPoint -> IO (Either Address [a])
-receiveMany localEndpoint = receive localEndpoint >>= \case
-    Received _ messages ->
+receiveMany localEndpoint = Transport.receive localEndpoint >>= \case
+    Transport.Received _ messages ->
       return $ Right $ map Binary.decode messages
-    ConnectionOpened {} ->
+    Transport.ConnectionOpened {} ->
       -- ignore, wait for the real messages
       receiveMany localEndpoint
-    ErrorEvent (TransportError (EventConnectionLost lostEndpointAddress) _) ->
+    Transport.ErrorEvent (Transport.TransportError (Transport.EventConnectionLost lostEndpointAddress) _) ->
       Left <$> parseEndpointAddress lostEndpointAddress
     err -> do
       -- some unexpected event we're not prepared to handle

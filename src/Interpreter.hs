@@ -155,7 +155,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
         -- if the grace period is really short, we might want to shorten the sending period as well
         let stopSendingTime = printResultTime `min` (sendingDuration `addUTCTime` startTime)
         
-        selfConnection <- snd <$> createConnectionStubbornly endpoint myAddress
+        selfConnection <- snd <$> createConnection endpoint myAddress
         
         liftIO $ do
           sleepUntil stopSendingTime

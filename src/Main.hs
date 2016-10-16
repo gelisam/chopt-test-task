@@ -33,8 +33,8 @@ main = do
         let peerAddresses = filter (/= myAddress) allAddresses
         
         runResourceT $ do
-          transport   <- snd <$> createTransportStubbornly myAddress
-          endpoint    <- snd <$> createEndpointStubbornly transport myAddress
-          connections <- mapM (fmap snd . createConnectionStubbornly endpoint) peerAddresses
+          transport   <- snd <$> createTransport myAddress
+          endpoint    <- snd <$> createEndpoint transport myAddress
+          connections <- mapM (fmap snd . createConnection endpoint) peerAddresses
           
           lift $ interpret userConfig startTime nbNodes myIndex myAddress endpoint connections algorithm
