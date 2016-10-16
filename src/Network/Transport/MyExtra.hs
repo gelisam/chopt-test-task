@@ -78,18 +78,23 @@ createConnection localEndpoint remoteAddress = allocate go Transport.close
             return $ Just connection
 
 
+-- a slightly simpler version of 'Network.Transport.Event'
+data Event a
+  = Received [a]
+  | BrokenConnection Address
+
 sendOne :: Binary a => a -> Connection -> IO ()
 sendOne x connection = join $ fromRightM <$> Transport.send connection [Binary.encode x]
 
-receiveMany :: Binary a => EndPoint -> IO (Either Address [a])
+receiveMany :: Binary a => EndPoint -> IO (Event a)
 receiveMany localEndpoint = Transport.receive localEndpoint >>= \case
     Transport.Received _ messages ->
-      return $ Right $ map Binary.decode messages
+      return $ Received $ map Binary.decode messages
     Transport.ConnectionOpened {} ->
       -- ignore, wait for the real messages
       receiveMany localEndpoint
     Transport.ErrorEvent (Transport.TransportError (Transport.EventConnectionLost lostEndpointAddress) _) ->
-      Left <$> parseEndpointAddress lostEndpointAddress
+      BrokenConnection <$> parseEndpointAddress lostEndpointAddress
     err -> do
       -- some unexpected event we're not prepared to handle
       fail (show err)

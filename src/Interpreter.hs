@@ -101,10 +101,10 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
           -- we have not called 'receiveMany' yet, do it now
           r <- liftIO $ receiveMany endpoint
           case r of
-            Right cs -> do
+            Received cs -> do
               pendingActions .= Just cs
               waitForContribution
-            Left _ ->
+            BrokenConnection _ ->
               -- we don't support broken connections yet, so let's assume the connection broke
               -- because that other node has terminated, and let's terminate too.
               terminate
