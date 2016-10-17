@@ -76,7 +76,7 @@ data InterpreterState = InterpreterState
 initialInterpreterState :: InterpreterState
 initialInterpreterState = InterpreterState
                         { _activeConnections    = mempty
-                        , _latestContribution   = (0, mempty)
+                        , _latestContribution   = mempty
                         , _canSendContributions = True
                         , _committedMessages    = mempty
                         , _previousScore        = 0

@@ -7,11 +7,8 @@ import           Prelude hiding (round)
 
 import           Control.Monad.Trans.State.Strict
 import           Data.Bits
-import           Data.Monoid
-import           Data.Sequence
 import           GHC.Generics
 import           System.Random
-import           Text.Printf
 
 import           Data.Binary.Strict
 
@@ -22,6 +19,7 @@ randomMessage :: Monad m => StateT StdGen m Message
 randomMessage = state $ randomR (0, 1)
 
 
+type RoundNumber = Int
 type NodeIndex = Int
 type BitSet = Integer 
 
@@ -33,87 +31,46 @@ type BitSet = Integer
 -- do this, we are guaranteed that once the exercise terminates, all the nodes will output
 -- messages 0 through n, some nodes will also output message n+1, but no node output will
 -- differ by more than this one message.
-data RoundStatus = RoundStatus
-  { roundMessage      :: !Message
-  , roundContributors :: !BitSet
+data Contribution = Contribution
+  { currentRoundNumber   :: !RoundNumber
+  , previousMessage      :: !Message
+  , currentBestCandidate :: !Message
+  , roundContributors    :: !BitSet
   }
   deriving (Eq, Generic, Show)
 
-instance Binary RoundStatus
+instance Binary Contribution
 
-instance Monoid RoundStatus where
-    mempty = RoundStatus 0 0
+instance Monoid Contribution where
+    mempty = Contribution 0 0 0 0
     
     -- this mappend is also commutative and idempotent
-    mappend (RoundStatus m1 c1) (RoundStatus m2 c2) = RoundStatus bestMessage allContributors
-      where
-        -- if we're going to drop messages, let's keep the one with the highest score :)
-        bestMessage = max m1 m2
-        
-        allContributors = c1 .|. c2
-
-initialRoundStatus :: NodeIndex -> Message -> RoundStatus
-initialRoundStatus myIndex message
-  = RoundStatus { roundMessage      = message
-                , roundContributors = bit myIndex  -- we only know about our own contribution
-                }
-
-countRoundContributors :: RoundStatus -> Int
-countRoundContributors = popCount . roundContributors
-
-
-type RoundNumber = Int
-
-data OverallStatus = OverallStatus
-  { numberOfNodes      :: !Int
-  , indexOfCurrentNode :: !NodeIndex  -- between 0 and numberOfNodes-1
-  , previousRounds     :: !(Seq Message)
-  , currentRoundNumber :: !RoundNumber
-  , currentRoundStatus :: !RoundStatus
-  , nextRoundStatus    :: !RoundStatus
-  }
-  deriving (Eq, Show)
-
-initialOverallStatus :: Int -> NodeIndex -> Message -> Message -> OverallStatus
-initialOverallStatus nbNodes myIndex message1 message2
-  = OverallStatus { numberOfNodes      = nbNodes
-                  , indexOfCurrentNode = myIndex
-                  , previousRounds     = mempty
-                  , currentRoundNumber = 0
-                  , currentRoundStatus = initialRoundStatus myIndex message1
-                  , nextRoundStatus    = initialRoundStatus myIndex message2
+    mappend s1@(Contribution r1 p1 m1 c1) s2@(Contribution r2 p2 m2 c2)
+      | r1 > r2 = s1
+      | r2 > r1 = s2
+      | otherwise = Contribution
+                  { currentRoundNumber   = if r1 == r2 then r1 else error "inconsistent round numbers"
+                  , previousMessage      = if p1 == p2 then p1 else error "inconsistent previous messages"
+                  , currentBestCandidate = max m1 m2  -- if we're going to drop messages, let's keep
+                                                      -- the one with the highest score :)
+                  , roundContributors    = c1 .|. c2
                   }
 
--- the round is complete when all the information is accumulated, that is, once we've
--- combined the candidate messages from all the contributors.
-isCurrentRoundComplete :: OverallStatus -> Bool
-isCurrentRoundComplete (OverallStatus {..})
-  = countRoundContributors currentRoundStatus == numberOfNodes
+firstRound :: NodeIndex -> Message -> Contribution
+firstRound myIndex message = Contribution
+                           { currentRoundNumber   = 0
+                           , previousMessage      = 0  -- a dummy value, there is no round -1
+                           , currentBestCandidate = message
+                           , roundContributors    = bit myIndex  -- we only know about our own contribution
+                           }
 
-bestMessageForCurrentRound :: OverallStatus -> Message
-bestMessageForCurrentRound = roundMessage . currentRoundStatus
+nextRound :: NodeIndex -> Message -> Contribution -> Contribution
+nextRound myIndex message (Contribution {..}) = Contribution
+                                              { currentRoundNumber   = currentRoundNumber + 1
+                                              , previousMessage      = currentBestCandidate
+                                              , currentBestCandidate = message
+                                              , roundContributors    = bit myIndex
+                                              }
 
-moveToNextRound :: Message -> OverallStatus -> OverallStatus
-moveToNextRound nextCandidate o@(OverallStatus {..})
-  = o { previousRounds     = previousRounds |> bestMessageForCurrentRound o
-      , currentRoundNumber = currentRoundNumber + 1
-      , currentRoundStatus = nextRoundStatus
-      , nextRoundStatus    = initialRoundStatus indexOfCurrentNode nextCandidate
-      }
-
-
-type Contribution = (RoundNumber, RoundStatus)
-
-currentContribution :: OverallStatus -> Contribution
-currentContribution (OverallStatus {..}) = (currentRoundNumber, currentRoundStatus)
-
-collectContribution :: Contribution -> OverallStatus -> OverallStatus
-collectContribution c@(roundNumber, status) o@(OverallStatus {..})
-  | roundNumber == currentRoundNumber     = o { currentRoundStatus = currentRoundStatus <> status }
-  | roundNumber == currentRoundNumber + 1 = o { nextRoundStatus    = nextRoundStatus    <> status }
-  | roundNumber >  currentRoundNumber + 1 =
-      error $ printf "the algorithm is broken! contribution %s should never have been sent since round %d is not yet decided"
-                     (show c)
-                     currentRoundNumber
-  | otherwise =
-      o  -- ignore contributions about already-decided rounds
+countRoundContributors :: Contribution -> Int
+countRoundContributors = popCount . roundContributors
