@@ -33,58 +33,63 @@ type Endpoint = EndPoint
 type EndpointAddress = EndPointAddress
 
 
+createUnprotectedTransport :: Address -> IO Transport
+createUnprotectedTransport (Address {..}) = untilJustM $ do
+    r <- TCP.createTransport addressHost
+                             (show addressPort)
+                             TCP.defaultTCPParameters
+    case r of
+      Left err | isAlreadyInUseError err -> do
+        -- sometimes the OS keeps sockets busy for a minute after a server stops, try again
+        printf "local port %d is busy, retrying...\n" addressPort
+        threadDelay (1000 * 1000)  -- 1s
+        return Nothing
+      Left err ->
+        fail $ show err
+      Right transport ->
+        return $ Just transport
+
 createTransport :: Address -> ResIO (ReleaseKey, Transport)
-createTransport (Address {..}) = allocate go Transport.closeTransport
-  where
-    go :: IO Transport
-    go = untilJustM $ do
-        r <- TCP.createTransport addressHost
-                                 (show addressPort)
-                                 TCP.defaultTCPParameters
-        case r of
-          Left err | isAlreadyInUseError err -> do
-            -- sometimes the OS keeps sockets busy for a minute after a server stops, try again
-            printf "local port %d is busy, retrying...\n" addressPort
-            threadDelay (1000 * 1000)  -- 1s
-            return Nothing
-          Left err ->
-            fail $ show err
-          Right transport ->
-            return $ Just transport
+createTransport myAddress = flip allocate Transport.closeTransport
+                          $ createUnprotectedTransport myAddress
+
+
+createUnprotectedEndpoint :: Transport -> Address -> IO Endpoint
+createUnprotectedEndpoint transport expectedAddress = do
+    endpoint <- join $ fromRightM <$> Transport.newEndPoint transport
+    if Transport.address endpoint == unparseEndpointAddress expectedAddress
+    then
+      return endpoint
+    else
+      fail $ printf "endpoint creation succeeded but the resulting address %s isn't the expected %s"
+                    (show $ Transport.address endpoint)
+                    (show $ unparse expectedAddress)
 
 createEndpoint :: Transport -> Address -> ResIO (ReleaseKey, Endpoint)
-createEndpoint transport expectedAddress = allocate go Transport.closeEndPoint
-  where
-    go :: IO Endpoint
-    go = do
-        endpoint <- join $ fromRightM <$> Transport.newEndPoint transport
-        if Transport.address endpoint == unparseEndpointAddress expectedAddress
-        then
-          return endpoint
-        else
-          fail $ printf "endpoint creation succeeded but the resulting address %s isn't the expected %s"
-                        (show $ Transport.address endpoint)
-                        (show $ unparse expectedAddress)
+createEndpoint transport expectedAddress = flip allocate Transport.closeEndPoint
+                                         $ createUnprotectedEndpoint transport expectedAddress
+
+
+createUnprotectedConnection :: Endpoint -> Address -> IO Connection
+createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
+    r <- Transport.connect localEndpoint
+                           (unparseEndpointAddress remoteAddress)
+                           Transport.ReliableOrdered
+                           Transport.defaultConnectHints
+    case r of
+      Left (Transport.TransportError Transport.ConnectNotFound _) -> do
+        -- the remote program probably isn't fully-initialized yet, try again.
+        printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
+        threadDelay (1000 * 1000)  -- 1s
+        return Nothing
+      Left (Transport.TransportError _ err) ->
+        fail err
+      Right connection ->
+        return $ Just connection
 
 createConnection :: Endpoint -> Address -> ResIO (ReleaseKey, Connection)
-createConnection localEndpoint remoteAddress = allocate go Transport.close
-  where
-    go :: IO Connection
-    go = untilJustM $ do
-        r <- Transport.connect localEndpoint
-                               (unparseEndpointAddress remoteAddress)
-                               Transport.ReliableOrdered
-                               Transport.defaultConnectHints
-        case r of
-          Left (Transport.TransportError Transport.ConnectNotFound _) -> do
-            -- the remote program probably isn't fully-initialized yet, try again.
-            printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
-            threadDelay (1000 * 1000)  -- 1s
-            return Nothing
-          Left (Transport.TransportError _ err) ->
-            fail err
-          Right connection ->
-            return $ Just connection
+createConnection localEndpoint remoteAddress = flip allocate Transport.close
+                                             $ createUnprotectedConnection localEndpoint remoteAddress
 
 
 -- a slightly simpler version of 'Network.Transport.Event'
