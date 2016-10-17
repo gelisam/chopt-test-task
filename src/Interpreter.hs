@@ -108,13 +108,19 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     mySeed = configRandomSeed + myIndex
     
     go1 :: MVar Action -> Command a -> MaybeT M a
-    go1 _ (Log v s)                 = liftIO $ putLogLn configVerbosity v s
     go1 _ GetNbNodes                = return nbNodes
     go1 _ GetMyNodeIndex            = return myIndex
     go1 _ GenerateRandomMessage     = lift . lift $ randomMessage
     go1 _ (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> do
-          connections <- toList <$> use activeConnections
+          remoteAddresses <- Map.keys <$> use activeConnections
+          liftIO $ putLogLn configVerbosity 3
+                 $ printf "node %s sends %s to %s"
+                          (unparse myAddress)
+                          (show c)
+                          (show (map unparse remoteAddresses))
+          
+          connections <- Map.elems <$> use activeConnections
           liftIO $ mapM_ (sendOne c) connections
           
           -- remember the contribution in case we reconnect to some of the missing connections
@@ -123,6 +129,11 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           return ()
     go1 mvar ReceiveContributions   = processActions mvar
     go1 _ (Commit m)                = do
+        liftIO $ putLogLn configVerbosity 2
+               $ printf "node %s commits to message %s"
+                        (unparse myAddress)
+                        (show m)
+        
         s <- use committedScore
         previousScore .= s
         
@@ -140,16 +151,18 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
                  $ printf "node %s connected with %s"
                           (unparse myAddress)
                           (unparse remoteAddress)
+          
           activeConnections %= Map.insert remoteAddress connection
           
           -- make sure that node is up to date
           c <- use latestContribution
+          liftIO $ sendOne c connection
+          
           liftIO $ putLogLn configVerbosity 3
                  $ printf "node %s sends %s to %s"
                           (unparse myAddress)
                           (show c)
                           (unparse remoteAddress)
-          liftIO $ sendOne c connection
           
           processActions mvar
         RemoveConnection remoteAddress -> do
@@ -157,9 +170,15 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
                  $ printf "node %s lost connection with %s"
                           (unparse myAddress)
                           (unparse remoteAddress)
+          
           activeConnections %= Map.delete remoteAddress
           processActions mvar
-        ProcessContributions cs ->
+        ProcessContributions cs -> do
+          liftIO $ putLogLn configVerbosity 3
+                 $ printf "node %s receives %s"
+                          (unparse myAddress)
+                          (show cs)
+          
           return cs
         StopSendingNow -> do
           canSendContributions .= False

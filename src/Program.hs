@@ -9,7 +9,6 @@ module Program where
 
 import           Control.Monad (ap)
 
-import           Log
 import           Message
 
 
@@ -17,7 +16,6 @@ import           Message
 -- type, not by the output type of a post-computation we stick after every command just
 -- so we can implement Functor.
 data Command a where
-    Log :: Verbosity -> String -> Command ()
     GetNbNodes :: Command Int
     GetMyNodeIndex :: Command NodeIndex  -- between 0 and NbNodes-1
     GenerateRandomMessage :: Command Message
@@ -45,9 +43,6 @@ instance Monad Program where
 
 liftCommand :: Command a -> Program a
 liftCommand cmd = Bind cmd Return
-
-log :: Verbosity -> String -> Program ()
-log v s = liftCommand $ Log v s
 
 getNbNodes :: Program Int
 getNbNodes = liftCommand GetNbNodes

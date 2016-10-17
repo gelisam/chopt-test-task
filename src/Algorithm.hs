@@ -1,8 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 module Algorithm where
 
-import           Prelude hiding (log, round)
-
 import           Control.Monad
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.State.Strict
