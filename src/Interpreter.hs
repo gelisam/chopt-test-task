@@ -20,7 +20,6 @@
 -- it succeeds, because 'receiveMany' already receives a notification when a new connection is
 -- established.
 
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -38,14 +37,12 @@ import Data.Foldable
 import Data.Sequence (Seq, (|>))
 import Data.Time
 import Data.Void
-import GHC.Generics
 import System.Random
 import Text.Printf
 
 import Config hiding (Command)
 import Control.Concurrent.MyExtra
 import Control.Monad.MyExtra
-import Data.Binary.Strict
 import Log
 import Message
 import Network.Transport.MyExtra
@@ -61,9 +58,6 @@ data Action
   = ProcessContributions [Contribution]
   | StopSendingNow
   | PrintResultNow
-  deriving (Generic, Eq, Show)
-
-instance Binary Action
 
 
 data InterpreterState = InterpreterState
@@ -72,7 +66,6 @@ data InterpreterState = InterpreterState
   , _previousScore        :: !Double
   , _committedScore       :: !Double
   }
-  deriving (Eq, Show)
 
 initialInterpreterState :: InterpreterState
 initialInterpreterState = InterpreterState
