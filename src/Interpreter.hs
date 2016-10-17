@@ -114,14 +114,19 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     go1 _ (BroadcastContribution c) = use canSendContributions >>= \case
         True  -> do
           remoteAddresses <- Map.keys <$> use activeConnections
-          liftIO $ putLogLn configVerbosity 3
-                 $ printf "node %s sends %s to %s"
-                          (unparse myAddress)
-                          (show c)
-                          (show (map unparse remoteAddresses))
-          
-          connections <- Map.elems <$> use activeConnections
-          liftIO $ mapM_ (sendOne c) connections
+          if not $ null remoteAddresses
+          then do
+            liftIO $ putLogLn configVerbosity 3
+                   $ printf "node %s sends %s to %s"
+                            (unparse myAddress)
+                            (show c)
+                            (show (map unparse remoteAddresses))
+            
+            connections <- Map.elems <$> use activeConnections
+            liftIO $ mapM_ (sendOne c) connections
+          else
+            -- maybe another thread will help us obtain a connection?
+            liftIO $ yield
           
           -- remember the contribution in case we reconnect to some of the missing connections
           latestContribution .= c
