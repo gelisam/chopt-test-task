@@ -14,7 +14,8 @@ import           Message
 -- runs forever
 algorithm :: Program Void
 algorithm = do
-    contribution0 <- firstRound <$> getMyNodeIndex <*> generateRandomMessage
+    contribution0 <- firstRound <$> getMyNodeIndex
+                                <*> generateRandomMessage
     nbNodes <- getNbNodes
     
     flip evalStateT contribution0 $ forever $ do
@@ -33,15 +34,20 @@ algorithm = do
           -- should not happen because at most two rounds should be active at any time
           fail "inconsistent difference in round numbers"
         
-        lift $ commit $ previousMessage c'
+        let m = previousMessage c'
+        lift $ commit m
         
         -- the next round has already started and we haven't contributed a message yet!
-        candidate <- nextRound <$> lift getMyNodeIndex <*> lift generateRandomMessage <*> pure c
+        candidate <- nextRound <$> lift getMyNodeIndex
+                               <*> lift generateRandomMessage
+                               <*> pure (c { currentBestCandidate = m })
         modify (<> candidate)
       c'' <- get
       
       -- determine if we should commit another message
       when (countRoundContributors c'' == nbNodes) $ do
         lift $ commit $ currentBestCandidate c''
-        candidate <- nextRound <$> lift getMyNodeIndex <*> lift generateRandomMessage <*> pure c''
+        candidate <- nextRound <$> lift getMyNodeIndex
+                               <*> lift generateRandomMessage
+                               <*> pure c''
         modify (<> candidate)
