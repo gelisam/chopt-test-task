@@ -1,3 +1,8 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 -- Without fault-tolerance nor a fixed time period of exexution, the interpreter is easy: acquire a
 -- connection to each of the other nodes, use them to send and receive messages when the Program says
 -- to, and continue doing so forever. What enables this simplicity is that we have a single input
@@ -18,11 +23,6 @@
 -- do this by spawning a reconnection thread each time we're diconnected from one of the other nodes.
 -- This reconnection thread repeatedly attempts to reconnect, and informs the interpreter when it
 -- succeeds, so that the interpreter can send the latest contribution to the newly-connected node.
-
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Interpreter (interpret) where
 
 import           Control.Concurrent
