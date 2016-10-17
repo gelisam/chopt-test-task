@@ -16,9 +16,8 @@
 -- messages with the nodes which are no longer reachable. At the same time, we should also repeatedly
 -- attempt to reconnect to those unreachable nodes, in case the network connectivity is restored. I
 -- do this by spawning a reconnection thread each time we're diconnected from one of the other nodes.
--- This reconnection thread repeatedly attempts to reconnect, and doesn't need to inform anyone when
--- it succeeds, because 'receiveMany' already receives a notification when a new connection is
--- established.
+-- This reconnection thread repeatedly attempts to reconnect, and informs the interpreter when it
+-- succeeds, so that the interpreter can send the latest contribution to the newly-connected node.
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -29,11 +28,14 @@ module Interpreter (interpret) where
 import           Control.Concurrent
 import           Control.Distributed.Process.Extras.Time
 import           Control.Lens (makeLenses, use, (.=), (%=), (+=))
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State.Strict
 import           Data.Foldable
+import qualified Data.Map.Strict as Map
+import           Data.Map.Strict (Map)
 import           Data.Sequence (Seq, (|>))
 import           Data.Time
 import           Data.Void
@@ -55,13 +57,17 @@ import           Text.Parsable
 -- described above will take care of auxiliary tasks such as making sure we stop after the allocated
 -- time expires. Here are the actions which the helpers can ask the interpreter to perform.
 data Action
-  = ProcessContributions [Contribution]
+  = AddConnection Address Connection
+  | RemoveConnection Address
+  | ProcessContributions [Contribution]
   | StopSendingNow
   | PrintResultNow
 
 
 data InterpreterState = InterpreterState
-  { _canSendContributions :: !Bool
+  { _activeConnections    :: !(Map Address Connection)
+  , _latestContribution   :: !Contribution
+  , _canSendContributions :: !Bool
   , _committedMessages    :: !(Seq Message)
   , _previousScore        :: !Double
   , _committedScore       :: !Double
@@ -69,7 +75,9 @@ data InterpreterState = InterpreterState
 
 initialInterpreterState :: InterpreterState
 initialInterpreterState = InterpreterState
-                        { _canSendContributions = True
+                        { _activeConnections    = mempty
+                        , _latestContribution   = (0, mempty)
+                        , _canSendContributions = True
                         , _committedMessages    = mempty
                         , _previousScore        = 0
                         , _committedScore       = 0
@@ -86,9 +94,10 @@ runM seed = flip evalStateT (mkStdGen seed)
           . flip evalStateT initialInterpreterState
 
 
-interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> Endpoint -> [Connection] -> Program Void -> IO ()
-interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint connections program = do
+interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> [Address] -> Endpoint -> Program Void -> IO ()
+interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddresses endpoint program = do
     mvar <- newEmptyMVar
+    mapM_ (connect mvar) peerAddresses
     _ <- forkIO $ timeKeeper mvar
     _ <- forkIO $ runTransportT $ contributionReceiver mvar
     runM mySeed (go mvar program)
@@ -104,8 +113,14 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
     go1 _ GetMyNodeIndex            = return myIndex
     go1 _ GenerateRandomMessage     = lift . lift $ randomMessage
     go1 _ (BroadcastContribution c) = use canSendContributions >>= \case
-        True  -> liftIO $ mapM_ (sendOne c) connections
-        False -> return ()
+        True  -> do
+          connections <- toList <$> use activeConnections
+          liftIO $ mapM_ (sendOne c) connections
+          
+          -- remember the contribution in case we reconnect to some of the missing connections
+          latestContribution .= c
+        False ->
+          return ()
     go1 mvar ReceiveContributions   = processActions mvar
     go1 _ (Commit m)                = do
         s <- use committedScore
@@ -120,6 +135,30 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
     -- Program, but control will return here soon enough.
     processActions :: MVar Action -> MaybeT M [Contribution]
     processActions mvar = (liftIO $ takeMVar mvar) >>= \case
+        AddConnection remoteAddress connection -> do
+          liftIO $ putLogLn configVerbosity 1
+                 $ printf "node %s connected with %s"
+                          (unparse myAddress)
+                          (unparse remoteAddress)
+          activeConnections %= Map.insert remoteAddress connection
+          
+          -- make sure that node is up to date
+          c <- use latestContribution
+          liftIO $ putLogLn configVerbosity 3
+                 $ printf "node %s sends %s to %s"
+                          (unparse myAddress)
+                          (show c)
+                          (unparse remoteAddress)
+          liftIO $ sendOne c connection
+          
+          processActions mvar
+        RemoveConnection remoteAddress -> do
+          liftIO $ putLogLn configVerbosity 1
+                 $ printf "node %s lost connection with %s"
+                          (unparse myAddress)
+                          (unparse remoteAddress)
+          activeConnections %= Map.delete remoteAddress
+          processActions mvar
         ProcessContributions cs ->
           return cs
         StopSendingNow -> do
@@ -150,7 +189,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
     
     go :: MVar Action -> Program Void -> M ()
     go mvar = untilNothingM $ \case
-        Return void -> absurd void
+        Return bottom -> absurd bottom
         Bind cr cc -> runMaybeT (cc <$> go1 mvar cr)
     
     timeKeeper :: MVar Action -> IO ()
@@ -176,13 +215,11 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
     contributionReceiver :: MVar Action -> TransportT IO ()
     contributionReceiver mvar = receiveMany endpoint >>= \case
         Received cs -> do
-          liftIO $ putMVar mvar (ProcessContributions cs)
+          liftIO $ putMVar mvar $ ProcessContributions cs
           contributionReceiver mvar
-        BrokenConnection remoteAddress ->
-          -- we don't support broken connections yet
-          fail $ printf "node %s lost connection with %s"
-                        (unparse myAddress)
-                        (unparse remoteAddress)
+        BrokenConnection remoteAddress -> do
+          liftIO $ putMVar mvar $ RemoveConnection remoteAddress
+          contributionReceiver mvar
         ClosedConnection _ ->
           -- another node has terminated, stop listening for more contributions.
           -- TODO: wait for messages from other nodes in an attempt to get a better score
@@ -190,3 +227,11 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress endpoint
         ClosedEndpoint ->
           -- the main thread has terminated, better stop too.
           return ()
+    
+    connect :: MVar Action -> Address -> IO ()
+    connect mvar remoteAddress = void $ forkIO $ do
+        -- 'createUnprotectedConnection' already tries to connect until it succeeds,
+        -- so there is nothing special to do
+        connection <- createUnprotectedConnection endpoint remoteAddress
+        
+        putMVar mvar $ AddConnection remoteAddress connection

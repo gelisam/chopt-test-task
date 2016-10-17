@@ -35,6 +35,5 @@ main = do
         runResourceT $ do
           transport   <- snd <$> createTransport myAddress
           endpoint    <- snd <$> createEndpoint transport myAddress
-          connections <- mapM (fmap snd . createConnection endpoint) peerAddresses
           
-          lift $ interpret userConfig startTime nbNodes myIndex myAddress endpoint connections algorithm
+          lift $ interpret userConfig startTime nbNodes myIndex myAddress peerAddresses endpoint algorithm

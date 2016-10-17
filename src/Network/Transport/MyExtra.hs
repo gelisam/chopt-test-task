@@ -5,7 +5,7 @@ module Network.Transport.MyExtra
   ( module Network.Transport.MyExtra
   
   -- re-export important types from "Network.Transport" so users don't have to also import it
-  , Connection, Transport  -- plus Endpoint and EndpointAddress, exported above
+  , Connection, ConnectionId, Transport  -- plus Endpoint and EndpointAddress, exported above
   ) where
 
 import           Control.Monad (join)
@@ -16,7 +16,7 @@ import           Control.Concurrent (threadDelay)
 import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
 import qualified Network.Transport as Transport
-import           Network.Transport (Connection, EndPoint, EndPointAddress, Transport)
+import           Network.Transport (Connection, ConnectionId, EndPoint, EndPointAddress, Transport)
 import qualified Network.Transport.TCP as TCP
 import           System.IO.Error (isAlreadyInUseError)
 import           Text.Printf
