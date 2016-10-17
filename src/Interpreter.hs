@@ -26,29 +26,29 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Interpreter (interpret) where
 
-import Control.Concurrent
-import Control.Distributed.Process.Extras.Time
-import Control.Lens (makeLenses, use, (.=), (%=), (+=))
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Maybe
-import Control.Monad.Trans.State.Strict
-import Data.Foldable
-import Data.Sequence (Seq, (|>))
-import Data.Time
-import Data.Void
-import System.Random
-import Text.Printf
+import           Control.Concurrent
+import           Control.Distributed.Process.Extras.Time
+import           Control.Lens (makeLenses, use, (.=), (%=), (+=))
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Maybe
+import           Control.Monad.Trans.State.Strict
+import           Data.Foldable
+import           Data.Sequence (Seq, (|>))
+import           Data.Time
+import           Data.Void
+import           System.Random
+import           Text.Printf
 
-import Config hiding (Command)
-import Control.Concurrent.MyExtra
-import Control.Monad.MyExtra
-import Log
-import Message
-import Network.Transport.MyExtra
-import Network.Transport.TCP.Address
-import Program
-import Text.Parsable
+import           Config hiding (Command)
+import           Control.Concurrent.MyExtra
+import           Control.Monad.MyExtra
+import           Log
+import           Message
+import           Network.Transport.MyExtra
+import           Network.Transport.TCP.Address
+import           Program
+import           Text.Parsable
 
 
 -- While the main interpreter will spend most of its time waiting for messages, the helper threads

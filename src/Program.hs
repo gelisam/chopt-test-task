@@ -7,10 +7,10 @@
 -- This is a perfect opportunity to use the free monad :)
 module Program where
 
-import Control.Monad (ap)
+import           Control.Monad (ap)
 
-import Log
-import Message
+import           Log
+import           Message
 
 
 -- I'm not using Control.Monad.Free because I want Commands to be indexed by their output

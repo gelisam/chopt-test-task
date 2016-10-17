@@ -3,10 +3,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Control.Monad.MyExtra where
 
-import Data.Function
-import Data.Proxy
-import Data.Typeable
-import Text.Printf
+import           Data.Function
+import           Data.Proxy
+import           Data.Typeable
+import           Text.Printf
 
 
 -- run the body until its accumulated results reaches the limit

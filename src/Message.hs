@@ -3,17 +3,17 @@
 {-# LANGUAGE RecordWildCards #-}
 module Message where
 
-import Prelude hiding (round)
+import           Prelude hiding (round)
 
-import Control.Monad.Trans.State.Strict
-import Data.Bits
-import Data.Monoid
-import Data.Sequence
-import GHC.Generics
-import System.Random
-import Text.Printf
+import           Control.Monad.Trans.State.Strict
+import           Data.Bits
+import           Data.Monoid
+import           Data.Sequence
+import           GHC.Generics
+import           System.Random
+import           Text.Printf
 
-import Data.Binary.Strict
+import           Data.Binary.Strict
 
 
 type Message = Double

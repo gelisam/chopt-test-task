@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Text.Parsable where
 
-import Text.Printf
+import           Text.Printf
 
 
 -- a variant of Read+Show which doesn't require the string form to be valid Haskell code.

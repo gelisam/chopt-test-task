@@ -1,11 +1,11 @@
 module Config where
 
-import Control.Distributed.Process.Extras.Time
-import Options.Applicative
+import           Control.Distributed.Process.Extras.Time
+import           Options.Applicative
 
-import Log
-import Network.Transport.TCP.Address
-import Text.Parsable
+import           Log
+import           Network.Transport.TCP.Address
+import           Text.Parsable
 
 
 data UserProvidedConfig = UserProvidedConfig

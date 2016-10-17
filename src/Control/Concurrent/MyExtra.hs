@@ -1,8 +1,8 @@
 module Control.Concurrent.MyExtra where
 
-import Control.Concurrent
-import Control.Distributed.Process.Extras.Time
-import Data.Time
+import           Control.Concurrent
+import           Control.Distributed.Process.Extras.Time
+import           Data.Time
 
 
 sleepUntil :: UTCTime -> IO ()
