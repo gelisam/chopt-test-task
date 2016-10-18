@@ -15,6 +15,7 @@ import           Control.Monad.Trans.State.Strict
 import           Control.Concurrent (threadDelay)
 import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
+import           Data.Maybe
 import qualified Network.Transport as Transport
 import           Network.Transport (Connection, ConnectionId, EndPoint, EndPointAddress, Transport)
 import qualified Network.Transport.TCP as TCP
@@ -123,7 +124,7 @@ sendOne x connection = do
 receiveMany :: Binary a => Endpoint -> TransportT IO (Event a)
 receiveMany localEndpoint = (liftIO $ Transport.receive localEndpoint) >>= \case
     Transport.Received _ messages ->
-      return $ Received $ map Binary.decode messages
+      return $ Received $ mapMaybe Binary.decode messages
     Transport.ConnectionOpened connectionId _ endpointAddress -> do
       -- store the mapping between connectionId and endpointAddress
       address <- parseEndpointAddress endpointAddress

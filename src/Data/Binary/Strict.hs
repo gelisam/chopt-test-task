@@ -16,8 +16,8 @@ encode :: Binary a => a -> Strict.ByteString
 encode x = let strictString = Lazy.toStrict $ Lazy.encode x
             in trace (show strictString) strictString
 
-decode :: Binary a => Strict.ByteString -> a
+decode :: Binary a => Strict.ByteString -> Maybe a
 decode strictString = let lazyString = Lazy.fromStrict strictString
                        in case Lazy.decodeOrFail lazyString of
-                            Left err -> error (show (strictString, err))
-                            Right (_,_,x) -> x
+                            Left err -> trace (show ("binary-bug", strictString, err)) Nothing
+                            Right (_,_,x) -> Just x
