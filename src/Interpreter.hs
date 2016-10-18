@@ -59,7 +59,7 @@ import           Text.Parsable
 data Action
   = AddConnection Address Connection
   | RemoveConnection Address
-  | ProcessContribution Contribution
+  | ProcessContribution NodeIndex Contribution
   | StopSendingNow
   | PrintResultNow
 
@@ -123,7 +123,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
                             (show (map unparse remoteAddresses))
             
             connections <- Map.elems <$> use activeConnections
-            liftIO $ mapM_ (sendOne c') connections
+            liftIO $ mapM_ (sendOne (myIndex, c')) connections
           else
             -- maybe another thread will help us obtain a connection?
             liftIO $ yield
@@ -161,7 +161,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           
           -- make sure that node is up to date
           c <- use latestContribution
-          liftIO $ sendOne c connection
+          liftIO $ sendOne (myIndex, c) connection
           
           liftIO $ putLogLn configVerbosity 3
                  $ printf "node %s sends %s to %s"
@@ -178,7 +178,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           
           activeConnections %= Map.delete remoteAddress
           processActions mvar
-        ProcessContribution c -> do
+        ProcessContribution _ c -> do
           liftIO $ putLogLn configVerbosity 3
                  $ printf "node %s receives %s"
                           (unparse myAddress)
@@ -238,13 +238,14 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     
     contributionReceiver :: MVar Action -> TransportT IO ()
     contributionReceiver mvar = receiveMany endpoint >>= \case
-        Received cs -> do
-          when (length cs > 1) $ do
+        Received labelledContributions -> do
+          when (length labelledContributions > 1) $ do
             liftIO $ putLogLn configVerbosity 1
-                   $ printf "node %s receives %d messages at onces, that's unusual"
+                   $ printf "node %s receives %d contributions at onces, that's unusual"
                             (unparse myAddress)
-                            (length cs)
-          liftIO $ mapM_ (putMVar mvar . ProcessContribution) cs
+                            (length labelledContributions)
+          liftIO $ forM_ labelledContributions $ \(i,c) ->
+            putMVar mvar (ProcessContribution i c)
           contributionReceiver mvar
         BrokenConnection remoteAddress -> do
           liftIO $ putMVar mvar $ RemoveConnection remoteAddress
