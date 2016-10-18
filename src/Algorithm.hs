@@ -23,9 +23,9 @@ algorithm = do
       c <- get
       lift $ broadcastContribution c
       
-      -- receive the contributions shared by others
-      cs <- lift $ receiveContributions
-      modify (<> mconcat (c:cs))
+      -- receive a contribution shared by some other node
+      c2 <- lift $ receiveContribution
+      modify (<> c2)
       c' <- get
       
       -- determine if we should commit a message

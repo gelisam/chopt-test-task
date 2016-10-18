@@ -20,7 +20,7 @@ data Command a where
     GetMyNodeIndex :: Command NodeIndex  -- between 0 and NbNodes-1
     GenerateRandomMessage :: Command Message
     BroadcastContribution :: Contribution -> Command ()
-    ReceiveContributions :: Command [Contribution]
+    ReceiveContribution :: Command Contribution
     Commit :: Message -> Command ()
 
 
@@ -56,8 +56,8 @@ generateRandomMessage = liftCommand GenerateRandomMessage
 broadcastContribution :: Contribution -> Program ()
 broadcastContribution contributions = liftCommand $ BroadcastContribution contributions
 
-receiveContributions :: Program [Contribution]
-receiveContributions = liftCommand ReceiveContributions
+receiveContribution :: Program Contribution
+receiveContribution = liftCommand ReceiveContribution
 
 commit :: Message -> Program ()
 commit message = liftCommand $ Commit message

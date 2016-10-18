@@ -59,7 +59,7 @@ import           Text.Parsable
 data Action
   = AddConnection Address Connection
   | RemoveConnection Address
-  | ProcessContributions [Contribution]
+  | ProcessContribution Contribution
   | StopSendingNow
   | PrintResultNow
 
@@ -132,7 +132,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           latestContribution .= c'
         False ->
           return ()
-    go1 mvar ReceiveContributions    = processActions mvar
+    go1 mvar ReceiveContribution     = processActions mvar
     go1 _ (Commit m)                 = do
         liftIO $ putLogLn configVerbosity 2
                $ printf "node %s commits to message %s"
@@ -147,9 +147,9 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
         committedScore += (fromIntegral i * m)
     
     -- We'll spend most of our time here, waiting for actions from the helper threads. When they send
-    -- us a list of contributions, we return them so 'go' and 'go1' can continue interpreting the
-    -- Program, but control will return here soon enough.
-    processActions :: MVar Action -> MaybeT M [Contribution]
+    -- us a contribution, we return them so 'go' and 'go1' can continue interpreting the Program, but
+    -- control will return here soon enough.
+    processActions :: MVar Action -> MaybeT M Contribution
     processActions mvar = (liftIO $ takeMVar mvar) >>= \case
         AddConnection remoteAddress connection -> do
           liftIO $ putLogLn configVerbosity 1
@@ -178,13 +178,13 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           
           activeConnections %= Map.delete remoteAddress
           processActions mvar
-        ProcessContributions cs -> do
+        ProcessContribution c -> do
           liftIO $ putLogLn configVerbosity 3
                  $ printf "node %s receives %s"
                           (unparse myAddress)
-                          (show cs)
+                          (show c)
           
-          return cs
+          return c
         StopSendingNow -> do
           canSendContributions .= False
           processActions mvar
@@ -239,7 +239,12 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     contributionReceiver :: MVar Action -> TransportT IO ()
     contributionReceiver mvar = receiveMany endpoint >>= \case
         Received cs -> do
-          liftIO $ putMVar mvar $ ProcessContributions cs
+          when (length cs > 1) $ do
+            liftIO $ putLogLn configVerbosity 1
+                   $ printf "node %s receives %d messages at onces, that's unusual"
+                            (unparse myAddress)
+                            (length cs)
+          liftIO $ mapM_ (putMVar mvar . ProcessContribution) cs
           contributionReceiver mvar
         BrokenConnection remoteAddress -> do
           liftIO $ putMVar mvar $ RemoveConnection remoteAddress
