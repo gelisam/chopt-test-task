@@ -29,11 +29,8 @@ main = do
           Just x -> return x
           Nothing -> fail $ printf "%s is a valid address but it is not listed in node_list.txt" (show myAddress)
         
-        let nbNodes       = length allAddresses
-        let peerAddresses = filter (/= myAddress) allAddresses
-        
         runResourceT $ do
           transport   <- snd <$> createTransport myAddress
           endpoint    <- snd <$> createEndpoint transport myAddress
           
-          lift $ interpret userConfig startTime nbNodes myIndex myAddress peerAddresses endpoint algorithm
+          lift $ interpret userConfig startTime myIndex myAddress allAddresses endpoint algorithm

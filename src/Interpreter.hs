@@ -94,14 +94,26 @@ runM seed = flip evalStateT (mkStdGen seed)
           . flip evalStateT initialInterpreterState
 
 
-interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> [Address] -> Endpoint -> Program Void -> IO ()
-interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddresses endpoint program = do
+interpret :: UserProvidedConfig -> UTCTime -> NodeIndex -> Address -> [Address] -> Endpoint -> Program Void -> IO ()
+interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses endpoint program = do
     mvar <- newEmptyMVar
     mapM_ (connect mvar) peerAddresses
     _ <- forkIO $ timeKeeper mvar
     _ <- forkIO $ runTransportT $ contributionReceiver mvar
     runM mySeed (go mvar program)
   where
+    nbNodes :: Int
+    nbNodes = length allAddresses
+    
+    peerAddresses :: [Address]
+    peerAddresses = filter (/= myAddress) allAddresses
+    
+    addressMap :: Map NodeIndex Address
+    addressMap = Map.fromList $ zip [0..] allAddresses
+    
+    indexToAddress :: NodeIndex -> Address
+    indexToAddress i = addressMap Map.! i
+    
     -- combine the shared configRandomSeed with the node index so that each node uses a different
     -- sequence of messages
     mySeed :: Int
@@ -111,27 +123,20 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     go1 _ GetNbNodes                 = return nbNodes
     go1 _ GetMyNodeIndex             = return myIndex
     go1 _ GenerateRandomMessage      = lift . lift $ randomMessage
-    go1 _ (BroadcastContribution c') = use canSendContributions >>= \case
-        True  -> do
-          remoteAddresses <- Map.keys <$> use activeConnections
-          if not $ null remoteAddresses
-          then do
-            liftIO $ putLogLn configVerbosity 3
-                   $ printf "node %s sends %s to %s"
-                            (unparse myAddress)
-                            (show c')
-                            (show (map unparse remoteAddresses))
-            
-            connections <- Map.elems <$> use activeConnections
-            liftIO $ mapM_ (sendOne (myIndex, c')) connections
-          else
-            -- maybe another thread will help us obtain a connection?
-            liftIO $ yield
+    go1 _ (BroadcastContribution c') = do
+        c <- use latestContribution
+        when (c /= c') $ do
+          liftIO $ putLogLn configVerbosity 4
+                 $ printf "node %s improves to %s"
+                          (unparse myAddress)
+                          (show c')
           
-          -- remember the contribution in case we reconnect to some of the missing connections
+          -- A surprising optimization: don't send anything yet! With finite bandwidth, flooding the
+          -- network with messages will only slow things down. Instead, we'll keep the number of in-
+          -- transit messages constant by doing some "ping-pong". We send a message to each of the
+          -- other nodes on startup and after reconnecting after a broken connection, and then we
+          -- wait until we hear back from them before sending the next message.
           latestContribution .= c'
-        False ->
-          return ()
     go1 mvar ReceiveContribution     = processActions mvar
     go1 _ (Commit m)                 = do
         liftIO $ putLogLn configVerbosity 2
@@ -178,11 +183,27 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           
           activeConnections %= Map.delete remoteAddress
           processActions mvar
-        ProcessContribution _ c -> do
+        ProcessContribution i c -> do
+          let remoteAddress = indexToAddress i
           liftIO $ putLogLn configVerbosity 3
-                 $ printf "node %s receives %s"
+                 $ printf "node %s receives %s from %s"
                           (unparse myAddress)
                           (show c)
+                          (unparse remoteAddress)
+          
+          -- ping-pong! send a message whenever we receive one
+          (Map.lookup remoteAddress <$> use activeConnections) >>= \case
+            Nothing ->
+              return ()
+            Just connection -> do
+              c' <- use latestContribution
+              liftIO $ sendOne (myIndex, c') connection
+              
+              liftIO $ putLogLn configVerbosity 3
+                     $ printf "node %s sends %s to %s"
+                              (unparse myAddress)
+                              (show c')
+                              (unparse remoteAddress)
           
           return c
         StopSendingNow -> do
