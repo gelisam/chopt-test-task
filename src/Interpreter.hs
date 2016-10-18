@@ -108,10 +108,10 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     mySeed = configRandomSeed + myIndex
     
     go1 :: MVar Action -> Command a -> MaybeT M a
-    go1 _ GetNbNodes                = return nbNodes
-    go1 _ GetMyNodeIndex            = return myIndex
-    go1 _ GenerateRandomMessage     = lift . lift $ randomMessage
-    go1 _ (BroadcastContribution c) = use canSendContributions >>= \case
+    go1 _ GetNbNodes                 = return nbNodes
+    go1 _ GetMyNodeIndex             = return myIndex
+    go1 _ GenerateRandomMessage      = lift . lift $ randomMessage
+    go1 _ (BroadcastContribution c') = use canSendContributions >>= \case
         True  -> do
           remoteAddresses <- Map.keys <$> use activeConnections
           if not $ null remoteAddresses
@@ -119,21 +119,21 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
             liftIO $ putLogLn configVerbosity 3
                    $ printf "node %s sends %s to %s"
                             (unparse myAddress)
-                            (show c)
+                            (show c')
                             (show (map unparse remoteAddresses))
             
             connections <- Map.elems <$> use activeConnections
-            liftIO $ mapM_ (sendOne c) connections
+            liftIO $ mapM_ (sendOne c') connections
           else
             -- maybe another thread will help us obtain a connection?
             liftIO $ yield
           
           -- remember the contribution in case we reconnect to some of the missing connections
-          latestContribution .= c
+          latestContribution .= c'
         False ->
           return ()
-    go1 mvar ReceiveContributions   = processActions mvar
-    go1 _ (Commit m)                = do
+    go1 mvar ReceiveContributions    = processActions mvar
+    go1 _ (Commit m)                 = do
         liftIO $ putLogLn configVerbosity 2
                $ printf "node %s commits to message %s"
                         (unparse myAddress)
