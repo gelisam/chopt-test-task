@@ -1,13 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Network.Transport.MyExtra
-  -- export everything from this module
-  ( module Network.Transport.MyExtra
+  ( TransportT, runTransportT, sendOne, receiveMany, resetEndpoint
   
   -- re-export important types from "Network.Transport" so users don't have to also import it
   , Connection, ConnectionId, Transport  -- plus Endpoint and EndpointAddress, exported above
   ) where
 
+import           Control.Lens (makeLenses, use, (.=), (%=))
 import           Control.Monad (join)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
@@ -15,12 +16,12 @@ import           Control.Monad.Trans.State.Strict
 import           Control.Concurrent (threadDelay)
 import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
-import           Data.Maybe
 import qualified Network.Transport as Transport
 import           Network.Transport (Connection, ConnectionId, EndPoint, EndPointAddress, Transport)
 import qualified Network.Transport.TCP as TCP
 import           System.IO.Error (isAlreadyInUseError)
 import           Text.Printf
+import Debug.Trace
 
 import           Control.Monad.MyExtra
 import qualified Data.Binary.Strict as Binary
@@ -29,13 +30,44 @@ import           Network.Transport.TCP.Address
 import           Text.Parsable
 
 
+data TransportState = TransportState
+  { _currentAddress   :: !Address
+  , _currentTransport :: !Transport
+  , _currentEndpoint  :: !EndPoint
+  , _connectionMap    :: !(Map Transport.ConnectionId Address)
+  }
+
+makeLenses ''TransportState
+
+
+type TransportT = StateT TransportState
+
+runTransportT :: Address -> TransportT IO a -> IO a
+runTransportT myAddress body = do
+    transport0 <- createTransportStubbornly myAddress
+    endpoint0 <- createEndpointStubbornly transport0 myAddress
+    evalStateT body (TransportState myAddress transport0 endpoint0 mempty)
+
+
+resetEndpoint :: TransportT IO ()
+resetEndpoint = do
+    endpoint <- use currentEndpoint
+    liftIO $ Transport.closeEndPoint endpoint
+    
+    transport <- use currentTransport
+    myAddress <- use currentAddress
+    endpoint' <- liftIO $ createEndpointStubbornly transport myAddress
+    currentEndpoint .= endpoint'
+
+
+
 -- Since I'm going to re-export this type anyway, I might as well use my preferred spelling
 type Endpoint = EndPoint
 type EndpointAddress = EndPointAddress
 
 
-createUnprotectedTransport :: Address -> IO Transport
-createUnprotectedTransport (Address {..}) = untilJustM $ do
+createTransportStubbornly :: Address -> IO Transport
+createTransportStubbornly (Address {..}) = untilJustM $ do
     r <- TCP.createTransport addressHost
                              (show addressPort)
                              TCP.defaultTCPParameters
@@ -50,13 +82,9 @@ createUnprotectedTransport (Address {..}) = untilJustM $ do
       Right transport ->
         return $ Just transport
 
-createTransport :: Address -> ResIO (ReleaseKey, Transport)
-createTransport myAddress = flip allocate Transport.closeTransport
-                          $ createUnprotectedTransport myAddress
 
-
-createUnprotectedEndpoint :: Transport -> Address -> IO Endpoint
-createUnprotectedEndpoint transport expectedAddress = do
+createEndpointStubbornly :: Transport -> Address -> IO Endpoint
+createEndpointStubbornly transport expectedAddress = do
     endpoint <- join $ fromRightM <$> Transport.newEndPoint transport
     if Transport.address endpoint == unparseEndpointAddress expectedAddress
     then
@@ -66,13 +94,9 @@ createUnprotectedEndpoint transport expectedAddress = do
                     (show $ Transport.address endpoint)
                     (show $ unparse expectedAddress)
 
-createEndpoint :: Transport -> Address -> ResIO (ReleaseKey, Endpoint)
-createEndpoint transport expectedAddress = flip allocate Transport.closeEndPoint
-                                         $ createUnprotectedEndpoint transport expectedAddress
 
-
-createUnprotectedConnection :: Endpoint -> Address -> IO Connection
-createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
+createConnectionStubbornly :: Endpoint -> Address -> IO Connection
+createConnectionStubbornly localEndpoint remoteAddress = untilJustM $ do
     r <- Transport.connect localEndpoint
                            (unparseEndpointAddress remoteAddress)
                            Transport.ReliableOrdered
@@ -88,24 +112,14 @@ createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
       Right connection ->
         return $ Just connection
 
-createConnection :: Endpoint -> Address -> ResIO (ReleaseKey, Connection)
-createConnection localEndpoint remoteAddress = flip allocate Transport.close
-                                             $ createUnprotectedConnection localEndpoint remoteAddress
-
 
 -- a slightly simpler version of 'Network.Transport.Event'
 data Event a
   = Received [a]
   | BrokenConnection Address
   | ClosedConnection Address
+  | UnstableEndpoint
   | ClosedEndpoint
-
-
--- 'ConnectionOpened' and 'ConnectionClosed' require us to keep track of ConnectionIds
-type TransportT = StateT (Map Transport.ConnectionId Address)
-
-runTransportT :: Monad m => TransportT m a -> m a
-runTransportT = flip evalStateT mempty
 
 
 sendOne :: Binary a => a -> Connection -> IO ()
@@ -123,17 +137,23 @@ sendOne x connection = do
 
 receiveMany :: Binary a => Endpoint -> TransportT IO (Event a)
 receiveMany localEndpoint = (liftIO $ Transport.receive localEndpoint) >>= \case
-    Transport.Received _ messages ->
-      return $ Received $ mapMaybe Binary.decode messages
+    Transport.Received _ bytestrings -> do
+      case traverse Binary.decode bytestrings of
+        Nothing -> do
+          -- we have received a partial message. this should not happen. but it does.
+          -- resetting the endpoint fixes it, tell the caller to do that.
+          return UnstableEndpoint
+        Just messages ->
+          return $ Received messages
     Transport.ConnectionOpened connectionId _ endpointAddress -> do
       -- store the mapping between connectionId and endpointAddress
       address <- parseEndpointAddress endpointAddress
-      modify $ Map.insert connectionId address
+      connectionMap %= Map.insert connectionId address
       
       -- wait for the real messages
       receiveMany localEndpoint
     Transport.ConnectionClosed connectionId -> do
-      Just address <- Map.lookup connectionId <$> get
+      Just address <- Map.lookup connectionId <$> use connectionMap 
       return $ ClosedConnection address
     Transport.ErrorEvent (Transport.TransportError (Transport.EventConnectionLost lostEndpointAddress) _) ->
       BrokenConnection <$> parseEndpointAddress lostEndpointAddress

@@ -87,7 +87,7 @@ makeLenses ''InterpreterState
 
 
 -- the interpreter's monad transformer stack: its state, the random number's state, and IO
-type M = StateT InterpreterState (StateT StdGen IO)
+type M = StateT InterpreterState (StateT StdGen (StateT Endpoint IO))
 
 runM :: Int -> M a -> IO a
 runM seed = flip evalStateT (mkStdGen seed)
@@ -95,11 +95,12 @@ runM seed = flip evalStateT (mkStdGen seed)
 
 
 interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> [Address] -> Endpoint -> Program Void -> IO ()
-interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddresses endpoint program = do
+interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddresses program = do
     mvar <- newEmptyMVar
-    mapM_ (connect mvar) peerAddresses
     _ <- forkIO $ timeKeeper mvar
-    _ <- forkIO $ runTransportT $ contributionReceiver mvar
+    _ <- forkIO $ runTransportT $ do
+      mapM_ (connect mvar) peerAddresses
+      contributionReceiver mvar
     runM mySeed (go mvar program)
   where
     -- combine the shared configRandomSeed with the node index so that each node uses a different
@@ -237,7 +238,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
         putMVar mvar PrintResultNow
     
     contributionReceiver :: MVar Action -> TransportT IO ()
-    contributionReceiver mvar = receiveMany endpoint >>= \case
+    contributionReceiver mvar = receiveMany >>= \case
         Received cs -> do
           liftIO $ putMVar mvar $ ProcessContributions cs
           contributionReceiver mvar
@@ -252,10 +253,10 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           -- the main thread has terminated, better stop too.
           return ()
     
-    connect :: MVar Action -> Address -> IO ()
+    connect :: MVar Action -> Address -> TransportT IO ()
     connect mvar remoteAddress = void $ forkIO $ do
         -- 'createUnprotectedConnection' already tries to connect until it succeeds,
         -- so there is nothing special to do
-        connection <- createUnprotectedConnection endpoint remoteAddress
+        connection <- createUnprotectedConnection remoteAddress
         
-        putMVar mvar $ AddConnection remoteAddress connection
+        liftIO $ putMVar mvar $ AddConnection remoteAddress connection

@@ -2,7 +2,6 @@ module Main where
 
 import           Control.Monad
 import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Resource
 import           Data.List
 import           Data.Time
 import           Options.Applicative (execParser)
@@ -32,8 +31,4 @@ main = do
         let nbNodes       = length allAddresses
         let peerAddresses = filter (/= myAddress) allAddresses
         
-        runResourceT $ do
-          transport   <- snd <$> createTransport myAddress
-          endpoint    <- snd <$> createEndpoint transport myAddress
-          
-          lift $ interpret userConfig startTime nbNodes myIndex myAddress peerAddresses endpoint algorithm
+        runTransportT myAddress $ interpret userConfig startTime nbNodes myIndex myAddress peerAddresses algorithm
