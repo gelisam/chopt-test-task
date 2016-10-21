@@ -273,10 +273,13 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
           liftIO $ putMVar mvar $ RemoveConnection remoteAddress
           liftIO $ connectLater mvar remoteAddress
           contributionReceiver mvar
-        ClosedConnection _ ->
-          -- another node has terminated, stop listening for more contributions.
-          -- TODO: wait for messages from other nodes in an attempt to get a better score
-          return ()
+        ClosedConnection remoteAddress -> do
+          -- this other node has terminated, stop sending it messages.
+          liftIO $ putMVar mvar $ RemoveConnection remoteAddress
+          
+          -- the grace period will end soon, but let's keep waiting for messages from other nodes
+          -- in an attempt to get a better score
+          contributionReceiver mvar
         ClosedEndpoint ->
           -- the main thread has terminated, better stop too.
           return ()
