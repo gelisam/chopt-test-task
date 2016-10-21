@@ -74,7 +74,7 @@ createUnprotectedConnection :: Endpoint -> Address -> IO Connection
 createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
     r <- Transport.connect localEndpoint
                            (unparseEndpointAddress remoteAddress)
-                           Transport.ReliableOrdered
+                           Transport.ReliableUnordered
                            Transport.defaultConnectHints
     case r of
       Left (Transport.TransportError Transport.ConnectNotFound _) -> do
