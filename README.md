@@ -204,3 +204,14 @@ Possible improvements
 2. Since the algorithm and the interpreter are very event-driven, I wonder if it would be possible to rewrite them in an FRP style, and whether that would make things clearer than the current imperative style?
 3. Instead of keeping exactly two messages per bidirectional channel at all times, each node could keep a counter for each channel in order to keep `N` messages per bidirectional channel at all times, that might reduce the performance gap between the optimal and constant-number-of-in-transit-messages variants.
 
+Configuration
+--
+
+The file `node_list.txt` must contain the network-process addresses of all the nodes, something like this:
+
+    192.168.0.123:8080:0
+    192.168.0.123:8081:0
+    192.168.0.123:8082:0
+    192.168.0.102:8083:0
+    192.168.0.102:8084:0
+    192.168.0.102:8085:0
