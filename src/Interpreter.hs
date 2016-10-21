@@ -97,7 +97,7 @@ runM seed = flip evalStateT (mkStdGen seed)
 interpret :: UserProvidedConfig -> UTCTime -> NodeIndex -> Address -> [Address] -> Endpoint -> Program Void -> IO ()
 interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses endpoint program = do
     mvar <- newEmptyMVar
-    mapM_ (connect mvar) peerAddresses
+    mapM_ (connectLater mvar) peerAddresses
     _ <- forkIO $ timeKeeper mvar
     _ <- forkIO $ runTransportT $ contributionReceiver mvar
     runM mySeed (go mvar program)
@@ -269,7 +269,9 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
             putMVar mvar (ProcessContribution i c)
           contributionReceiver mvar
         BrokenConnection remoteAddress -> do
+          -- stop sending messages to that address until 'connectLater' tells us we're reconnected
           liftIO $ putMVar mvar $ RemoveConnection remoteAddress
+          liftIO $ connectLater mvar remoteAddress
           contributionReceiver mvar
         ClosedConnection _ ->
           -- another node has terminated, stop listening for more contributions.
@@ -279,8 +281,8 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
           -- the main thread has terminated, better stop too.
           return ()
     
-    connect :: MVar Action -> Address -> IO ()
-    connect mvar remoteAddress = void $ forkIO $ do
+    connectLater :: MVar Action -> Address -> IO ()
+    connectLater mvar remoteAddress = void $ forkIO $ do
         -- 'createUnprotectedConnection' already tries to connect until it succeeds,
         -- so there is nothing special to do
         connection <- createUnprotectedConnection endpoint remoteAddress
