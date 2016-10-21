@@ -262,7 +262,7 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
         Received labelledContributions -> do
           when (length labelledContributions > 1) $ do
             liftIO $ putLogLn configVerbosity 1
-                   $ printf "node %s receives %d contributions at onces, that's unusual"
+                   $ printf "node %s receives %d contributions at once, that's unusual"
                             (unparse myAddress)
                             (length labelledContributions)
           liftIO $ forM_ labelledContributions $ \(i,c) ->
