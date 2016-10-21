@@ -168,11 +168,11 @@ Incorrect improvements
 
 Here are a few improvements which might spring to mind.
 
-Instead of dropping all the messages except the maximum, couldn't we accumulate the messages from all the nodes, sort them by value, and thereby commit to as many messages as there are nodes on each round, say 100, instead of just 1?
+Instead of dropping all the messages except the maximum, couldn't we accumulate the messages from all the nodes, sort them by value, and thereby commit to as many messages as there are nodes on each round, say 10, instead of just 1?
 
-Or: instead of using this protocol on every message, couldn't the nodes optimistically exchange a large number of messages, and only perform the costly protocol in order to commit, say each batch of 100 messages?
+Or: instead of using this protocol on every message, couldn't the nodes optimistically exchange a large number of messages, and only perform the costly protocol in order to commit, say, each batch of 100 messages?
 
-Both of those strategies have the same flaw: while they do commit to messages faster under ideal network conditions, committing to more than one message at a time means that under adversarial network conditions, some nodes will now output 100 fewer messages than others instead of just one, so these variants do not satisfy my correctness requirements.
+Both of those strategies have the same flaw: while they do commit to messages faster under ideal network conditions, committing to more than one message at a time means that under adversarial network conditions, some nodes will now output 10 or 100 fewer messages than others instead of just one, so these variants do not satisfy my correctness requirements.
 
 Speaking of which, there are also other improvements which might aim at improving the probability that all the nodes have the exact same output, accepting that the one message difference might happen, but only under very unlikely network conditions. I don't think that doing so is a good idea. By making the case in which there is a one message difference very unlikely, others are likely to write code which assumes that this case never happens, which might cause bugs which are difficult to reproduce because the conditions under which they can be reproduced are intentionally unlikely. I think it is better to embrace the limitations of an algorithm and to build a more robust system around it, than to hide its limitations and to accidentally build a fragile system around it.
 
