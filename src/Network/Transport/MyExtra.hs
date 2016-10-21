@@ -24,6 +24,7 @@ import           Text.Printf
 import           Control.Monad.MyExtra
 import qualified Data.Binary.Strict as Binary
 import           Data.Binary.Strict (Binary)
+import           Log
 import           Network.Transport.TCP.Address
 import           Text.Parsable
 
@@ -33,15 +34,16 @@ type Endpoint = EndPoint
 type EndpointAddress = EndPointAddress
 
 
-createUnprotectedTransport :: Address -> IO Transport
-createUnprotectedTransport (Address {..}) = untilJustM $ do
+createUnprotectedTransport :: Verbosity -> Address -> IO Transport
+createUnprotectedTransport verbosity (Address {..}) = untilJustM $ do
     r <- TCP.createTransport addressHost
                              (show addressPort)
                              TCP.defaultTCPParameters
     case r of
       Left err | isAlreadyInUseError err -> do
         -- sometimes the OS keeps sockets busy for a minute after a server stops, try again
-        printf "local port %d is busy, retrying...\n" addressPort
+        putLogLn verbosity 1
+               $ printf "local port %d is busy, retrying...\n" addressPort
         threadDelay (1000 * 1000)  -- 1s
         return Nothing
       Left err ->
@@ -49,9 +51,9 @@ createUnprotectedTransport (Address {..}) = untilJustM $ do
       Right transport ->
         return $ Just transport
 
-createTransport :: Address -> ResIO (ReleaseKey, Transport)
-createTransport myAddress = flip allocate Transport.closeTransport
-                          $ createUnprotectedTransport myAddress
+createTransport :: Verbosity -> Address -> ResIO (ReleaseKey, Transport)
+createTransport verbosity myAddress = flip allocate Transport.closeTransport
+                                    $ createUnprotectedTransport verbosity myAddress
 
 
 createUnprotectedEndpoint :: Transport -> Address -> IO Endpoint
@@ -70,8 +72,8 @@ createEndpoint transport expectedAddress = flip allocate Transport.closeEndPoint
                                          $ createUnprotectedEndpoint transport expectedAddress
 
 
-createUnprotectedConnection :: Endpoint -> Address -> IO Connection
-createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
+createUnprotectedConnection :: Verbosity -> Endpoint -> Address -> IO Connection
+createUnprotectedConnection verbosity localEndpoint remoteAddress = untilJustM $ do
     r <- Transport.connect localEndpoint
                            (unparseEndpointAddress remoteAddress)
                            Transport.ReliableUnordered
@@ -79,7 +81,8 @@ createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
     case r of
       Left (Transport.TransportError Transport.ConnectNotFound _) -> do
         -- the remote program probably isn't fully-initialized yet, try again.
-        printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
+        putLogLn verbosity 1
+               $ printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
         threadDelay (1000 * 1000)  -- 1s
         return Nothing
       Left (Transport.TransportError _ err) ->
@@ -87,9 +90,9 @@ createUnprotectedConnection localEndpoint remoteAddress = untilJustM $ do
       Right connection ->
         return $ Just connection
 
-createConnection :: Endpoint -> Address -> ResIO (ReleaseKey, Connection)
-createConnection localEndpoint remoteAddress = flip allocate Transport.close
-                                             $ createUnprotectedConnection localEndpoint remoteAddress
+createConnection :: Verbosity -> Endpoint -> Address -> ResIO (ReleaseKey, Connection)
+createConnection verbosity localEndpoint remoteAddress = flip allocate Transport.close
+                                                       $ createUnprotectedConnection verbosity localEndpoint remoteAddress
 
 
 -- a slightly simpler version of 'Network.Transport.Event'

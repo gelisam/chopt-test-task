@@ -293,6 +293,6 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
     connectLater mvar remoteAddress = void $ forkIO $ do
         -- 'createUnprotectedConnection' already tries to connect until it succeeds,
         -- so there is nothing special to do
-        connection <- createUnprotectedConnection endpoint remoteAddress
+        connection <- createUnprotectedConnection configVerbosity endpoint remoteAddress
         
         putMVar mvar $ AddConnection remoteAddress connection

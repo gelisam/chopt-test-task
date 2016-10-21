@@ -9,7 +9,7 @@ import           Options.Applicative (execParser)
 import           Text.Printf
 
 import           Algorithm
-import           Config (Command(..), commandInfo, FileProvidedConfig(..))
+import           Config (Command(..), commandInfo, FileProvidedConfig(..), UserProvidedConfig(..))
 import           Interpreter
 import           Network.Transport.MyExtra
 import           Text.Parsable
@@ -30,7 +30,7 @@ main = do
           Nothing -> fail $ printf "%s is a valid address but it is not listed in node_list.txt" (show myAddress)
         
         runResourceT $ do
-          transport   <- snd <$> createTransport myAddress
+          transport   <- snd <$> createTransport (configVerbosity userConfig) myAddress
           endpoint    <- snd <$> createEndpoint transport myAddress
           
           lift $ interpret userConfig startTime myIndex myAddress allAddresses endpoint algorithm
