@@ -69,6 +69,7 @@ data InterpreterState = InterpreterState
   , _latestContribution   :: !Contribution
   , _canSendContributions :: !Bool
   , _committedMessages    :: !(Seq Message)
+  , _scoreMultiplier      :: !Int
   , _previousScore        :: !Double
   , _committedScore       :: !Double
   }
@@ -79,6 +80,7 @@ initialInterpreterState = InterpreterState
                         , _latestContribution   = mempty
                         , _canSendContributions = True
                         , _committedMessages    = mempty
+                        , _scoreMultiplier      = 1
                         , _previousScore        = 0
                         , _committedScore       = 0
                         }
@@ -147,9 +149,12 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
         s <- use committedScore
         previousScore .= s
         
-        committedMessages %= (|> m)
-        i <- length <$> use committedMessages
+        when (not configOmitMessageList) $ do
+          committedMessages %= (|> m)
+        
+        i <- use scoreMultiplier
         committedScore += (fromIntegral i * m)
+        scoreMultiplier += 1
     
     -- We'll spend most of our time here, waiting for actions from the helper threads. When they send
     -- us a contribution, we return them so 'go' and 'go1' can continue interpreting the Program, but
