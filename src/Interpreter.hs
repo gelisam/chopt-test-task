@@ -244,7 +244,7 @@ interpret (UserProvidedConfig {..}) startTime myIndex myAddress allAddresses end
         let terminationTime = totalDuration `addUTCTime` startTime
         
         -- if we wait until the end of the grace period we'll be killed before printing anything
-        let printResultTime = timeIntervalToDiffTime (seconds (-1)) `addUTCTime` terminationTime
+        let printResultTime = timeIntervalToDiffTime (seconds (-2)) `addUTCTime` terminationTime
         
         -- if the grace period is really short, we might want to shorten the sending period as well
         let stopSendingTime = printResultTime `min` (sendingDuration `addUTCTime` startTime)
