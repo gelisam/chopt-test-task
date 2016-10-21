@@ -261,9 +261,13 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     connect mvar localEndpoint remoteAddress = void $ forkIO $ do
         -- 'createUnprotectedConnection' already tries to connect until it succeeds,
         -- so there is nothing special to do
-        connection <- createConnectionStubbornly localEndpoint remoteAddress
-        
-        liftIO $ putMVar mvar $ AddConnection remoteAddress connection
+        r <- createConnectionStubbornly localEndpoint remoteAddress
+        case r of
+          Just connection ->
+            liftIO $ putMVar mvar $ AddConnection remoteAddress connection
+          Nothing ->
+            -- the endpoint was closed, 'contributionReceiver' will reconnect for us
+            return ()
     
     connectAll :: MVar Action -> TransportT IO ()
     connectAll mvar = do

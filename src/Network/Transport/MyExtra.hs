@@ -101,7 +101,7 @@ createEndpointStubbornly transport expectedAddress = do
 getMyEndpoint :: TransportT IO Endpoint
 getMyEndpoint = use currentEndpoint
 
-createConnectionStubbornly :: Endpoint -> Address -> IO Connection
+createConnectionStubbornly :: Endpoint -> Address -> IO (Maybe Connection)
 createConnectionStubbornly localEndpoint remoteAddress = untilJustM $ do
     r <- Transport.connect localEndpoint
                            (unparseEndpointAddress remoteAddress)
@@ -113,10 +113,12 @@ createConnectionStubbornly localEndpoint remoteAddress = untilJustM $ do
         printf "remote address %s unreachable, retrying...\n" (unparse remoteAddress)
         threadDelay (1000 * 1000)  -- 1s
         return Nothing
+      Left (Transport.TransportError Transport.ConnectFailed "Endpoint closed") ->
+        return $ Just Nothing
       Left (Transport.TransportError _ err) ->
         fail err
       Right connection ->
-        return $ Just connection
+        return $ Just $ Just connection
 
 
 -- a slightly simpler version of 'Network.Transport.Event'
