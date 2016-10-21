@@ -180,7 +180,7 @@ Speaking of which, there are also other improvements which might aim at improvin
 Limiting bandwidth usage
 --
 
-Achieving an optimal score comes at the cost of a considerable amount of bandwidth. Bandwidth usage has no effect on my theoretical model, since the limit of one commit per round means that the latency is the most important factor, but bandwidth does have a significant impact in the real world, and it can even impact latency if messages queue up somewhere in the middle.
+Achieving an optimal score comes at the cost of a considerable amount of bandwidth. Bandwidth usage has no effect the theoretical speed of my algorithm, since my cost model only considers the latency, but bandwidth usage does have a significant impact in the real world, as it can impact latency when messages queue up somewhere in the middle.
 
 The biggest problem of my algorithm is that each message received triggers a broadcast, so several messages are sent, each of which in turn causes several other messages to be sent, and so on exponentially. The exponential growth eventually stops once every node commits to a message and stops propagating the messages from the previous round, and then it begins anew with the next round. If the network conditions restrict the number of messages which can be exchanged in a given period of time, this exponential curve can be quite problematic.
 
