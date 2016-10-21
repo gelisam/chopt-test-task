@@ -99,8 +99,7 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
     mvar <- newEmptyMVar
     _ <- forkIO $ timeKeeper mvar
     _ <- forkIO $ runTransportT myAddress $ do
-      localEndpoint <- getMyEndpoint
-      liftIO $ mapM_ (connect mvar localEndpoint) peerAddresses
+      connectAll mvar
       contributionReceiver mvar
     runM mySeed (go mvar program)
   where
@@ -250,6 +249,10 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           -- another node has terminated, stop listening for more contributions.
           -- TODO: wait for messages from other nodes in an attempt to get a better score
           return ()
+        UnstableEndpoint -> do
+          resetMyEndpoint
+          connectAll mvar
+          contributionReceiver mvar
         ClosedEndpoint ->
           -- the main thread has terminated, better stop too.
           return ()
@@ -261,3 +264,8 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
         connection <- createConnectionStubbornly localEndpoint remoteAddress
         
         liftIO $ putMVar mvar $ AddConnection remoteAddress connection
+    
+    connectAll :: MVar Action -> TransportT IO ()
+    connectAll mvar = do
+      localEndpoint <- getMyEndpoint
+      liftIO $ mapM_ (connect mvar localEndpoint) peerAddresses
