@@ -1,7 +1,6 @@
 module Main where
 
 import           Control.Monad
-import           Control.Monad.Trans.Class
 import           Data.List
 import           Data.Time
 import           Options.Applicative (execParser)
@@ -10,7 +9,6 @@ import           Text.Printf
 import           Algorithm
 import           Config (Command(..), commandInfo, FileProvidedConfig(..))
 import           Interpreter
-import           Network.Transport.MyExtra
 import           Text.Parsable
 
 
@@ -31,4 +29,4 @@ main = do
         let nbNodes       = length allAddresses
         let peerAddresses = filter (/= myAddress) allAddresses
         
-        runTransportT myAddress $ interpret userConfig startTime nbNodes myIndex myAddress peerAddresses algorithm
+        interpret userConfig startTime nbNodes myIndex myAddress peerAddresses algorithm

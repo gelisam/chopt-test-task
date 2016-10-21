@@ -87,19 +87,20 @@ makeLenses ''InterpreterState
 
 
 -- the interpreter's monad transformer stack: its state, the random number's state, and IO
-type M = StateT InterpreterState (StateT StdGen (StateT Endpoint IO))
+type M = StateT InterpreterState (StateT StdGen IO)
 
 runM :: Int -> M a -> IO a
 runM seed = flip evalStateT (mkStdGen seed)
           . flip evalStateT initialInterpreterState
 
 
-interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> [Address] -> Endpoint -> Program Void -> IO ()
+interpret :: UserProvidedConfig -> UTCTime -> Int -> NodeIndex -> Address -> [Address] -> Program Void -> IO ()
 interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddresses program = do
     mvar <- newEmptyMVar
     _ <- forkIO $ timeKeeper mvar
-    _ <- forkIO $ runTransportT $ do
-      mapM_ (connect mvar) peerAddresses
+    _ <- forkIO $ runTransportT myAddress $ do
+      localEndpoint <- getMyEndpoint
+      liftIO $ mapM_ (connect mvar localEndpoint) peerAddresses
       contributionReceiver mvar
     runM mySeed (go mvar program)
   where
@@ -253,10 +254,10 @@ interpret (UserProvidedConfig {..}) startTime nbNodes myIndex myAddress peerAddr
           -- the main thread has terminated, better stop too.
           return ()
     
-    connect :: MVar Action -> Address -> TransportT IO ()
-    connect mvar remoteAddress = void $ forkIO $ do
+    connect :: MVar Action -> Endpoint -> Address -> IO ()
+    connect mvar localEndpoint remoteAddress = void $ forkIO $ do
         -- 'createUnprotectedConnection' already tries to connect until it succeeds,
         -- so there is nothing special to do
-        connection <- createUnprotectedConnection remoteAddress
+        connection <- createConnectionStubbornly localEndpoint remoteAddress
         
         liftIO $ putMVar mvar $ AddConnection remoteAddress connection
